@@ -32,10 +32,11 @@ contains
 		
 	    ! Input related variables
 	    character(len=100) :: buffer, label
-	    integer :: pos
-	    integer :: ios = 0
-	    integer :: line = 0
-		integer :: ix
+	    integer 	:: pos
+	    integer 	:: ios = 0
+	    integer 	:: line = 0
+		integer 	:: ix
+		real(dbl)	:: tmp_nsamples = 0d0
 
 	    open(main_input_unit, file=filename)
 
@@ -79,7 +80,8 @@ contains
 	          case ('nthresh')
 	             read(buffer, *, iostat=ios) sys%nthresh
 			  case ('nsamples')
-			  	 read(buffer, *, iostat=ios) sys%nsamples
+			  	 read(buffer, *, iostat=ios) tmp_nsamples
+				 sys%nsamples = int(tmp_nsamples)
    			  case ('energy')
    			  	 read(buffer, *, iostat=ios) sys%e_target
    			  case ('deltae')
