@@ -22,7 +22,7 @@ module constants
 	real(dbl), parameter	:: TO_S  = 2.418884326509D-17 ! a.u. to s
 	real(dbl), parameter	:: TO_CM = 8065.5 ! eV to cm-1
 	real(dbl), parameter	:: V_CONVERT = 1.49198625108D+5 ! TO_ME * sqrt(TO_ME/TO_EV)
-	real(dbl), parameter	:: RAD_CONVERT = 5.18533758D-7
+	real(dbl), parameter	:: RAD_CONVERT = 1.0781987879D+6
 	
 contains
 	real(dbl) function factorial(n) result(fac)

@@ -21,7 +21,7 @@ program main
 	character(8)  :: date
 	character(10) :: time
 	call date_and_time(date, time)
-	write (*, *) 'KNAPSACK, version 1.0, Dec 2019'
+	write (*, *) 'KNAPSACK, version 1.01, Mar 2020'
 	write (*, *) 'by Robert A. Shaw'
 	write (*, '(1x, a, 2x, 5a, 2x, 5a)') 'Called at:', date(1:4), '/', date(5:6), '/', date(7:8), &
 		 											   time(1:2), ':', time(3:4), ':', time(5:6)
