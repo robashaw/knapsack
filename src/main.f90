@@ -50,7 +50,7 @@ program main
 		if (sys%do_rad) then
 			write (*, *)
 			write (*, *) 'RADIATIVE RATE CALCULATION'
-			call calculate_rate(sys%k_r, sys%radfile)
+			call calculate_rate(sys%k_r, sys%radfile, sys%radunits)
 			sys%k_r = sys%k_r * RAD_CONVERT * (sys%tdm**2)
 			write (*, '(1x,a,1x,e14.8,1x,a)') 'k_r =', sys%k_r, 's-1' 
 		end if

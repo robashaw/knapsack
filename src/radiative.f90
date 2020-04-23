@@ -1,5 +1,5 @@
 module radiative
-	use constants, only : dbl, tolint, radiative_unit
+	use constants
 	implicit none
 	
 contains
@@ -19,17 +19,32 @@ contains
 		end do
 	end subroutine trapezium
 	
-	subroutine calculate_rate(value, filename)
+	subroutine calculate_rate(value, filename, eunits)
 		real(dbl), intent(out)			:: value
 		character(len=*), intent(in)	:: filename
 		
 		integer 	:: nlines, nvalues, firstline, ios, line, i
-		real(dbl)	:: x, f, norm
+		real(dbl)	:: x, f, norm, unit_conversion
 		real(dbl), allocatable, dimension(:)  :: xvals, fvals
 		character(len=100)	:: iom
 		
 		write(*, *) 'Calculating radiative rate'
 		write(*, *) 'Reading spectral data from ', filename
+		write(*, *) 'Assuming energy units of ', eunits
+		
+		select case(eunits)
+		case ('kj')
+			unit_conversion = KJ_TO_EV
+		case ('ha')
+			unit_conversion = HA_TO_EV
+		case ('kcal')
+			unit_conversion = KCAL_TO_EV
+		case ('cm')
+			unit_conversion = CM_TO_EV
+		case default
+			unit_conversion = 1d0 ! assume in eV already
+		end select	
+		
 		open(radiative_unit, file=filename, iostat=ios)
 		firstline = 0
 		f = 0d0
@@ -53,7 +68,7 @@ contains
 			do line = 1, nlines
 				read(radiative_unit, *, iostat=ios, iomsg=iom) x, f
 				if (line .ge. firstline) then 
-					xvals(i) = x
+					xvals(i) = x * unit_conversion ! make sure in eV
 					fvals(i) = f
 					i = i + 1
 				end if

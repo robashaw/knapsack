@@ -9,6 +9,7 @@ module constants
 	integer, parameter		:: bfile_unit = 16
 	integer, parameter		:: gradfile_unit = 17
 	integer, parameter		:: radiative_unit = 18
+	integer, parameter		:: occs_unit = 19
 	integer, parameter		:: n_guesses = 10
 	integer, parameter		:: n_cut_guess = 4	
 	integer, parameter		:: print_frequency = 100000
@@ -21,6 +22,10 @@ module constants
 	real(dbl), parameter	:: TO_EV = 27.21138602 ! Ha to eV
 	real(dbl), parameter	:: TO_S  = 2.418884326509D-17 ! a.u. to s
 	real(dbl), parameter	:: TO_CM = 8065.5 ! eV to cm-1
+	real(dbl), parameter	:: KJ_TO_EV = 0.0103641 ! kJ/mol to eV
+	real(dbl), parameter	:: CM_TO_EV = 1.23981D-4 ! cm-1 to eV
+	real(dbl), parameter	:: KCAL_TO_EV = 0.0433634 ! kcal/ol to eV
+	real(dbl), parameter	:: HA_TO_EV = 27.2107 ! Hartree to eV
 	real(dbl), parameter	:: V_CONVERT = 1.49198625108D+5 ! TO_ME * sqrt(TO_ME/TO_EV)
 	real(dbl), parameter	:: RAD_CONVERT = 1.0781987879D+6
 	

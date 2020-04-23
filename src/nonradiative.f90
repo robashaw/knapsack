@@ -5,7 +5,8 @@ module nonradiative
 	type sysdata
 		logical										:: do_rad, do_nonrad
 		integer										:: ncut, nthresh, nlevels, nsamples, natoms
-		character(len=100)							:: bfile, gradfile, algorithm, weighting, radfile, calctype
+		character(len=100)							:: bfile, gradfile, algorithm, weighting
+		character(len=100)							:: radfile, calctype, radunits
 		real(dbl)									:: k_ic, k_r, e_target, delta_e, gamma, tdm
 		real(dbl), dimension(:), allocatable		:: energies, hrfactors, masses, V_vq_j
 		real(dbl), dimension(:, :), allocatable		:: fcfactors
@@ -73,6 +74,9 @@ contains
 			  case ('calculation')
 			  	 read(buffer, *, iostat=ios) sys%calctype
 				 sys%calctype = trim(adjustl(sys%calctype))
+   			  case ('radunits')
+   			  	 read(buffer, *, iostat=ios) sys%radunits
+   				 sys%calctype = trim(adjustl(sys%radunits))
 	          case ('ncut')
 	             read(buffer, *, iostat=ios) sys%ncut
    	          case ('natoms')
@@ -282,11 +286,15 @@ contains
 		integer, dimension(sys%nlevels, noccs), intent(in)	:: occs
 		logical, intent(in)									:: init
 		
-		integer		:: nx
-		real(dbl)	:: res(sys%nlevels), tmp
-		real(dbl)	:: grads(sys%natoms, 3)
+		integer			:: nx, ix
+		integer(bigint)	:: counter(20)
+		real(dbl)		:: res(sys%nlevels), tmp
+		real(dbl)		:: grads(sys%natoms, 3), sums(20), nsums(100)
 		
 		if (init) then
+			counter = 0
+			sums = 0d0
+			nsums = 0d0
 			sys%k_ic = 0d0
 			if (.not. allocated(sys%V_vq_j)) call sys%build_V(grads)
 			call sys%calculate_gamma
@@ -295,7 +303,29 @@ contains
 		do nx=1,noccs
 			call sys%compute_zn(occs(:, nx), res)
 			tmp = dot_product(res, sys%V_vq_j)
-			sys%k_ic = sys%k_ic + tmp*tmp
+			tmp = tmp**2
+			sys%k_ic = sys%k_ic + tmp
+			tmp = 4d0 * tmp / sys%gamma
+			ix = int(min(max(1d0, log10(tmp)+15d0), 20d0))
+			counter(ix) = counter(ix) + 1
+			sums(ix) = sums(ix) + tmp
+			ix = int(sum(occs(:, nx)))
+			nsums(ix) = nsums(ix) + tmp
+			if (tmp > 1.0d0) then
+				write(*, *) occs(:, nx), tmp
+			end if
+		end do
+		
+		write(*, *) '\nLog10', 'Counter', 'Sum'
+		do nx=1,20
+			write(*, *) nx-15, counter(nx), sums(nx)
+		end do
+		
+		write(*, *) '\nNSUMS'
+		do nx=1,100
+			if (nsums(nx) .gt. 1e-12) then
+				write(*, *) nx, nsums(nx)
+			end if
 		end do
 		
 		sys%k_ic = 4d0 * sys%k_ic / sys%gamma 
