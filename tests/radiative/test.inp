@@ -1,3 +1,4 @@
 calculation,	radiative
 spectrum,	spectrum.txt
+radunits, 	ev
 tdm,		3.9699

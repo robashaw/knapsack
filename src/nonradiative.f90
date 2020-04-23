@@ -76,7 +76,7 @@ contains
 				 sys%calctype = trim(adjustl(sys%calctype))
    			  case ('radunits')
    			  	 read(buffer, *, iostat=ios) sys%radunits
-   				 sys%calctype = trim(adjustl(sys%radunits))
+   				 sys%radunits = trim(adjustl(sys%radunits))
 	          case ('ncut')
 	             read(buffer, *, iostat=ios) sys%ncut
    	          case ('natoms')

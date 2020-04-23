@@ -21,29 +21,35 @@ contains
 	
 	subroutine calculate_rate(value, filename, eunits)
 		real(dbl), intent(out)			:: value
-		character(len=*), intent(in)	:: filename
+		character(len=*), intent(in)	:: filename, eunits
 		
 		integer 	:: nlines, nvalues, firstline, ios, line, i
 		real(dbl)	:: x, f, norm, unit_conversion
 		real(dbl), allocatable, dimension(:)  :: xvals, fvals
-		character(len=100)	:: iom
+		character(len=100)	:: iom, unit_format
 		
 		write(*, *) 'Calculating radiative rate'
 		write(*, *) 'Reading spectral data from ', filename
-		write(*, *) 'Assuming energy units of ', eunits
 		
 		select case(eunits)
 		case ('kj')
 			unit_conversion = KJ_TO_EV
+			unit_format = 'kJ/mol'
 		case ('ha')
 			unit_conversion = HA_TO_EV
+			unit_format = 'Ha'
 		case ('kcal')
 			unit_conversion = KCAL_TO_EV
+			unit_format = 'kcal/mol'
 		case ('cm')
 			unit_conversion = CM_TO_EV
+			unit_format = 'cm-1'
 		case default
 			unit_conversion = 1d0 ! assume in eV already
+			unit_format = 'eV'
 		end select	
+		
+		write(*, *) 'Assuming energy units of ', trim(unit_format)
 		
 		open(radiative_unit, file=filename, iostat=ios)
 		firstline = 0
