@@ -30,6 +30,7 @@ program main
 	if (ios .eq. 0) then
 		call cpu_time(start)
 		call sys%from_file(arg)
+		call sys%init
 		
   	 	select case (sys%calctype)
 	 	case ('radiative')
@@ -69,6 +70,13 @@ program main
 			allocate(maxoccs(sys%nlevels))
 			minoccs = 0
 			maxoccs = [(sys%cutoffs(ix, sys%nthresh+1), ix=1,sys%nlevels)]
+			if (sys%debug_level .gt. 0) then
+				write(*, *)
+				write(*, '(a10,1x,a)') 'ENERGY', 'MAX. OCC.'
+				do ix=1,sys%nlevels
+					write(*, '(f10.6,1x,i9)') sys%energies(ix), maxoccs(ix)
+				end do
+			end if
 			
 			emin = sys%e_target * TO_EV - sys%delta_e
 			emax = emin + 2*sys%delta_e

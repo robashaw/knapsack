@@ -1,19 +1,23 @@
 module nonradiative
 	use constants
+	use ioutil
 	implicit none
 	
 	type sysdata
 		logical										:: do_rad, do_nonrad
-		integer										:: ncut, nthresh, nlevels, nsamples, natoms
+		integer										:: ncut, nthresh, nlevels, nsamples, natoms, debug_level
 		character(len=100)							:: bfile, gradfile, algorithm, weighting
-		character(len=100)							:: radfile, calctype, radunits
-		real(dbl)									:: k_ic, k_r, e_target, delta_e, gamma, tdm
+		character(len=100)							:: radfile, calctype, radunits, sortby
+		real(dbl)									:: k_ic, k_r, e_target, delta_e, gamma, tdm, memory
 		real(dbl), dimension(:), allocatable		:: energies, hrfactors, masses, V_vq_j
 		real(dbl), dimension(:, :), allocatable		:: fcfactors
 		real(dbl), dimension(:, :, :), allocatable	:: Bvqj
 		integer, dimension(:, :), allocatable		:: cutoffs, bounds
+		integer, dimension(:), allocatable			:: energy_order
+		type(memorymanager)							:: mm
 	contains
 		procedure	:: from_file => sysdata_from_file
+		procedure	:: init => sysdata_init
 		procedure	:: fc_compute => sysdata_fc_compute
 		procedure	:: cutoff_compute => sysdata_cutoff_compute
 		procedure	:: compute_zn => sysdata_compute_zn
@@ -45,6 +49,7 @@ contains
 	    ! an endfile condition was detected.  It is positive if an error was
 	    ! detected.  ios is zero otherwise.
 
+		sys%debug_level = 0
 	    do while (ios == 0)
 	       read(main_input_unit, '(A)', iostat=ios) buffer
 	       if (ios == 0) then
@@ -77,6 +82,11 @@ contains
    			  case ('radunits')
    			  	 read(buffer, *, iostat=ios) sys%radunits
    				 sys%radunits = trim(adjustl(sys%radunits))
+      		  case ('sortby')
+      			 read(buffer, *, iostat=ios) sys%sortby
+      		     sys%sortby = trim(adjustl(sys%sortby))
+   	          case ('debug')
+   	             read(buffer, *, iostat=ios) sys%debug_level
 	          case ('ncut')
 	             read(buffer, *, iostat=ios) sys%ncut
    	          case ('natoms')
@@ -86,6 +96,8 @@ contains
 			  case ('nsamples')
 			  	 read(buffer, *, iostat=ios) tmp_nsamples
 				 sys%nsamples = int(tmp_nsamples)
+      		  case ('memory')
+      			 read(buffer, *, iostat=ios) sys%memory
    			  case ('energy')
    			  	 read(buffer, *, iostat=ios) sys%e_target
    			  case ('deltae')
@@ -111,6 +123,30 @@ contains
 	    end do
 		close(main_input_unit)
 	end subroutine sysdata_from_file
+	
+	subroutine sysdata_init(sys)
+		class(sysdata), intent(inout)	:: sys
+		
+		integer	:: ix
+		real(dbl), dimension(sys%nlevels) :: unsorted_levels
+		
+		allocate(sys%energy_order(sys%nlevels))
+		do ix=1,sys%nlevels
+			sys%energy_order(ix) = ix
+		end do
+		
+		if (sys%sortby .eq. 'energy') then
+			unsorted_levels(:) = sys%energies(:)
+			call sort_list(sys%nlevels, unsorted_levels, sys%energies, sys%energy_order)
+			call reorder_list(sys%nlevels, sys%hrfactors, sys%energy_order)
+		else
+			! reverse sort by HR factor by default
+			unsorted_levels(:) = -sys%hrfactors(:)
+			call sort_list(sys%nlevels, unsorted_levels, sys%hrfactors, sys%energy_order)
+			sys%hrfactors = -sys%hrfactors
+			call reorder_list(sys%nlevels, sys%energies, sys%energy_order)
+		end if
+	end subroutine sysdata_init
 	
 	subroutine sysdata_fc_compute(sys)
 		class(sysdata), intent(inout)	:: sys
@@ -185,6 +221,7 @@ contains
 		if (allocated(sys%Bvqj)) deallocate(sys%Bvqj)
 		if (allocated(sys%cutoffs)) deallocate(sys%cutoffs)
 		if (allocated(sys%bounds)) deallocate(sys%bounds)
+		if (allocated(sys%bounds)) deallocate(sys%energy_order)
 	end subroutine sysdata_free
 	
 	real(dbl) function	compute_kfcn(sys, occs) result(kfcn)
@@ -260,6 +297,8 @@ contains
 		close(bfile_unit)
 		
 		sys%V_vq_j = sys%V_vq_j * V_CONVERT / TO_S
+		! reorder V according to the energy order used
+		call reorder_list(sys%nlevels, sys%V_vq_j, sys%energy_order)
 	end subroutine sysdata_build_V
 	
 	subroutine sysdata_calc_gamma(sys)
@@ -311,22 +350,29 @@ contains
 			sums(ix) = sums(ix) + tmp
 			ix = int(sum(occs(:, nx)))
 			nsums(ix) = nsums(ix) + tmp
-			if (tmp > 1.0d0) then
-				write(*, *) occs(:, nx), tmp
+			if (sys%debug_level .gt. 3) then
+				if (tmp > 1.0d0) then
+					write(*, *) occs(:, nx), tmp
+				end if
 			end if
 		end do
 		
-		write(*, *) '\nLog10', 'Counter', 'Sum'
-		do nx=1,20
-			write(*, *) nx-15, counter(nx), sums(nx)
-		end do
 		
-		write(*, *) '\nNSUMS'
-		do nx=1,100
-			if (nsums(nx) .gt. 1e-12) then
-				write(*, *) nx, nsums(nx)
-			end if
-		end do
+		if (sys%debug_level .gt. 2) then
+			write(*, *) '\nLog10', 'Counter', 'Sum'
+			do nx=1,20
+				write(*, *) nx-15, counter(nx), sums(nx)
+			end do
+		end if
+		
+		if (sys%debug_level .gt. 1) then
+			write(*, *) '\nNSUMS'
+			do nx=1,100
+				if (nsums(nx) .gt. 1e-12) then
+					write(*, *) nx, nsums(nx)
+				end if
+			end do
+		end if
 		
 		sys%k_ic = 4d0 * sys%k_ic / sys%gamma 
 	end subroutine sysdata_calc_kic

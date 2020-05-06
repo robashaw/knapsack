@@ -43,10 +43,24 @@ contains
 		end do
 	end subroutine sort_list
 	
+	subroutine reorder_list(n, list, indices)
+		integer, intent(in)						:: n
+		real(dbl), dimension(n), intent(inout)	:: list 
+		integer, dimension(n), intent(in)		:: indices
+	
+		integer :: ix
+		real(dbl), dimension(n)	:: listcopy
+		listcopy(:) = list(:)
+		
+		do ix=1,n
+			list(ix) = listcopy(indices(ix))
+		end do
+	end subroutine reorder_list
+	
 	subroutine mm_init(mm, n, max_noccs, max_mem)
 		class(memorymanager), intent(inout)		:: mm
 		integer, intent(in) 					:: n
-		integer(bigint)							:: max_noccs
+		integer(bigint), intent(in)				:: max_noccs
 		real(dbl), intent(in)					:: max_mem
 		
 		real(dbl) :: mem_estimate

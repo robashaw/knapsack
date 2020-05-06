@@ -2,11 +2,12 @@ calculation,	nonradiative
 algorithm,	hybrid
 weighting,	fc
 energy,		0.107768
+debug,		1
 deltae,		0.04
 natoms,		20
 bfile,		Bvectors.dat
 gradfile,	NAME.dat
-ncut,		5
+ncut,		10
 nthresh,	18
 nsamples,	50000000
 levels,		52
@@ -53,8 +54,8 @@ levels,		52
 0.175970491,	0.217
 0.183316543,	0.049
 0.185155226,	0.337
-0.19583024,8	0.491
-0.1982429,77	0.281
+0.195830248,	0.491
+0.198242977,	0.281
 0.205196,	0.77
 0.222836443,	0.242
 0.392212225,	0.043
