@@ -10,7 +10,6 @@ program main
 	type(sysdata)							:: sys
 	integer, dimension(:, :), allocatable 	:: occlist
 	real(dbl), dimension(:), allocatable	:: enlist
-	integer, dimension(:), allocatable		:: minoccs, maxoccs
 	integer, dimension(:, :), allocatable	:: guesses
 	integer									:: ix
 	integer(bigint)							:: noccs, worst_case
@@ -30,7 +29,6 @@ program main
 	if (ios .eq. 0) then
 		call cpu_time(start)
 		call sys%from_file(arg)
-		call sys%init
 		
   	 	select case (sys%calctype)
 	 	case ('radiative')
@@ -48,6 +46,8 @@ program main
 			write (*, *) 'Nothing to do here? No calculation type set.'
 	 	end select
 		
+		call sys%init
+		
 		if (sys%do_rad) then
 			write (*, *)
 			write (*, *) 'RADIATIVE RATE CALCULATION'
@@ -62,19 +62,13 @@ program main
 			write (*, '(1x,a,i2,a,a)') 'Read in ', sys%nlevels, ' energy levels from file ', arg
 			write (*, *)
 			if ((sys%algorithm .ne. 'brute') .and. (sys%algorithm .ne. 'stochastic')) sys%algorithm = 'hybrid'
-			call sys%fc_compute
-			call sys%cutoff_compute
 			noccs = 1
 			
-			allocate(minoccs(sys%nlevels))
-			allocate(maxoccs(sys%nlevels))
-			minoccs = 0
-			maxoccs = [(sys%cutoffs(ix, sys%nthresh+1), ix=1,sys%nlevels)]
 			if (sys%debug_level .gt. 0) then
 				write(*, *)
 				write(*, '(a10,1x,a)') 'ENERGY', 'MAX. OCC.'
 				do ix=1,sys%nlevels
-					write(*, '(f10.6,1x,i9)') sys%energies(ix), maxoccs(ix)
+					write(*, '(f10.6,1x,i9)') sys%energies(ix), sys%maxoccs(ix)
 				end do
 			end if
 			
@@ -85,29 +79,29 @@ program main
 			write (*, '(1x,a,a,1x,a,i2)') 'Using algorithm: ', trim(sys%algorithm), 'with ncut = ', sys%ncut
 			select case (sys%algorithm)
 			case ('brute')
-				call brute_force(sys%nlevels, sys%energies, maxoccs, minoccs, emax, emin, occlist, enlist, noccs)
+				call brute_force(sys, emax, emin, occlist, enlist, noccs)
 			case ('stochastic')
-				maxoccs = [(min(n_cut_guess, sys%cutoffs(ix, sys%nthresh+1)), ix=1,sys%nlevels)]
+				sys%maxoccs = [(min(n_cut_guess, sys%cutoffs(ix, sys%nthresh+1)), ix=1,sys%nlevels)]
 				allocate(guesses(n_guesses, sys%nlevels))
 				write(*, '(1x,a,i2)') "Generating guesses with ncut = ", n_cut_guess
 				do ix=1,n_guesses
 					target_en = emin + ((real(ix)-0.5d0)/real(n_guesses)) * (emax - emin)
-					call knap_n(target_en, sys%nlevels, sys%energies, maxoccs, 0.05d0, guesses(ix, :), guess_ens(ix))
+					call knap_n(target_en, sys%nlevels, sys%energies, sys%maxoccs, 0.05d0, guesses(ix, :), guess_ens(ix))
 					write (*, *) guesses(ix, :), guess_ens(ix)
 				end do
-				maxoccs = [(sys%cutoffs(ix, sys%nthresh+1), ix=1,sys%nlevels)]
+				sys%maxoccs = [(sys%cutoffs(ix, sys%nthresh+1), ix=1,sys%nlevels)]
 				write(*, *) "Sampling"
 				allocate(occlist(sys%nlevels, sys%nsamples)) 
 				allocate(enlist(sys%nsamples))
 				select case (sys%weighting)
 				case ('fc')
-					call do_sample(sys, guesses, maxoccs, guess_ens, emin, emax, weighted_indices, tbl, occlist, enlist, noccs)
+					call do_sample(sys, guesses, sys%maxoccs, guess_ens, emin, emax, weighted_indices, tbl, occlist, enlist, noccs)
 				case default
-					call do_sample(sys, guesses, maxoccs, guess_ens, emin, emax, uniform_indices, tbl, occlist, enlist, noccs)
+					call do_sample(sys, guesses, sys%maxoccs, guess_ens, emin, emax, uniform_indices, tbl, occlist, enlist, noccs)
 				end select
 				noccs = noccs + 1
 			case default
-				worst_case = ncombinations(sys%nlevels, maxoccs, minoccs) 
+				worst_case = sys%maxnoccs 
 				call screened_brute_force(sys, emax, emin, occlist, enlist, noccs, worst_case)
 			end select
 			noccs = noccs - 1

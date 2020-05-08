@@ -1,5 +1,6 @@
 module knapsack
 	use constants, only : dbl, bigint, print_frequency
+	use ioutil, only : ncombinations
 	use progress, only : progress_bar_time
 	use nonradiative
 	implicit none
@@ -150,39 +151,27 @@ contains
 		end do		
 	end subroutine iterate
 	
-	integer(bigint) function ncombinations(n, max_occs, min_occs) result(max_nocc)
-		integer, intent(in)					:: n
-		integer, dimension(n), intent(in)	:: max_occs, min_occs
-		integer								:: ix
-		
-		max_nocc = 1
-		do ix=1,n
-			max_nocc = max_nocc * (max_occs(ix) - min_occs(ix) + 1)
-		end do
-	end function ncombinations
-	
-	subroutine brute_force(n, values, max_occs, min_occs, emax, emin, occlist, enlist, noccs)
-		integer, intent(in)									:: n
-		integer, dimension(n), intent(in) 					:: max_occs, min_occs
-		real(dbl), dimension(n), intent(in) 				:: values
+	subroutine brute_force(sys, emax, emin, occlist, enlist, noccs)
+		type(sysdata), intent(in)							:: sys
 		real(dbl), intent(in)								:: emax, emin
 		integer, allocatable, dimension(:, :), intent(out)	:: occlist
 		real(dbl), allocatable, dimension(:), intent(out)	:: enlist
 		integer(bigint), intent(out)						:: noccs
 		
 		integer(bigint) :: max_nocc, occsize, checked
-		integer	:: cocc(n), ix
+		integer	:: cocc(sys%nlevels), ix
 		cocc = 0
-		cocc(1) = max(min_occs(1), 1)
-		max_nocc = ncombinations(n, max_occs, min_occs)
+		cocc(1) = max(sys%minoccs(1), 1)
+		max_nocc = sys%maxnoccs
 		occsize = max_nocc / 10
 		
-		allocate(occlist(n, occsize))
+		allocate(occlist(sys%nlevels, occsize))
 		allocate(enlist(occsize))
 		noccs = 1
 		checked = 0
 		write(*, '(1x,a,1x,e12.4,1x,a)') 'Estimated', real(max_nocc), 'occupations to check'
-		call iterate(n, occsize, values, max_occs, min_occs, emax, emin, cocc, 1, occlist, enlist, noccs, checked, max_nocc)
+		call iterate(sys%nlevels, occsize, sys%energies, sys%maxoccs, sys%minoccs,&
+			 		 emax, emin, cocc, 1, occlist, enlist, noccs, checked, max_nocc)
 		call progress_bar_time(max_nocc, max_nocc)
 		write(*, *)
 	end subroutine brute_force
@@ -199,7 +188,7 @@ contains
 		integer	:: cocc(sys%nlevels), ix
 		cocc = 0
 		cocc(1) = sys%cutoffs(1, sys%nthresh+1)
-		call sys%screened_ncombinations(max_nocc)
+		max_nocc = sys%maxnoccs
 		occsize = max_nocc / 2
 		
 		allocate(occlist(sys%nlevels, occsize))

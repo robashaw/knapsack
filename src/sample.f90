@@ -1,20 +1,12 @@
 module sample
 	use constants, only : dbl, bigint, damping, maxnchange, n_guesses, print_frequency
+	use ioutil, only : energy
 	use random
 	use progress, only : progress_bar_time
 	use hashtbl
 	use nonradiative
 	implicit none
-contains
-	function energy(n, values, occs)
-		integer, intent(in)					:: n
-		real(dbl), dimension(n), intent(in) :: values
-		integer, dimension(n), intent(in) 	:: occs
-		real(dbl)							:: energy
-		
-		energy = dot_product(occs, values)
-	end function energy
-	
+contains	
 	subroutine differences(n, values, res)
 		integer, intent(in)						:: n
 		real(dbl), dimension(n), intent(in) 	:: values
@@ -45,7 +37,7 @@ contains
 		call get_hash(n, occlist(1:n, noccs+1), hash_str)
 		call tbl%get(hash_str, outix)
 		if (outix == 0) then
-			en = energy(n, values, occlist(:, noccs+1))
+			en = energy(n, values, values, occlist(:, noccs+1))
 			if ((en > emin) .and. (en < emax)) then
 				noccs = noccs + 1
 				call tbl%put(hash_str, int(noccs))

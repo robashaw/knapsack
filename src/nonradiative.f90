@@ -6,6 +6,7 @@ module nonradiative
 	type sysdata
 		logical										:: do_rad, do_nonrad
 		integer										:: ncut, nthresh, nlevels, nsamples, natoms, debug_level
+		integer(bigint)								:: maxnoccs
 		character(len=100)							:: bfile, gradfile, algorithm, weighting
 		character(len=100)							:: radfile, calctype, radunits, sortby
 		real(dbl)									:: k_ic, k_r, e_target, delta_e, gamma, tdm, memory
@@ -14,6 +15,7 @@ module nonradiative
 		real(dbl), dimension(:, :, :), allocatable	:: Bvqj
 		integer, dimension(:, :), allocatable		:: cutoffs, bounds
 		integer, dimension(:), allocatable			:: energy_order
+		integer, dimension(:), allocatable			:: minoccs, maxoccs
 		type(memorymanager)							:: mm
 	contains
 		procedure	:: from_file => sysdata_from_file
@@ -50,6 +52,7 @@ contains
 	    ! detected.  ios is zero otherwise.
 
 		sys%debug_level = 0
+		sys%memory = 0.5d0
 	    do while (ios == 0)
 	       read(main_input_unit, '(A)', iostat=ios) buffer
 	       if (ios == 0) then
@@ -146,6 +149,20 @@ contains
 			sys%hrfactors = -sys%hrfactors
 			call reorder_list(sys%nlevels, sys%energies, sys%energy_order)
 		end if
+		
+		! calculate maximum no. of occs and initialise memory manager
+		if (sys%do_nonrad) then
+			call sys%fc_compute
+			call sys%cutoff_compute
+			
+			allocate(sys%minoccs(sys%nlevels))
+			allocate(sys%maxoccs(sys%nlevels))
+			sys%minoccs = 0
+			sys%maxoccs = [(sys%cutoffs(ix, sys%nthresh+1), ix=1,sys%nlevels)]
+			sys%maxnoccs = ncombinations(sys%nlevels, sys%maxoccs, sys%minoccs)
+			
+			call sys%mm%initialise(sys%nlevels, sys%maxnocss, sys%memory)
+		end if
 	end subroutine sysdata_init
 	
 	subroutine sysdata_fc_compute(sys)
@@ -221,7 +238,9 @@ contains
 		if (allocated(sys%Bvqj)) deallocate(sys%Bvqj)
 		if (allocated(sys%cutoffs)) deallocate(sys%cutoffs)
 		if (allocated(sys%bounds)) deallocate(sys%bounds)
-		if (allocated(sys%bounds)) deallocate(sys%energy_order)
+		if (allocated(sys%energy_order)) deallocate(sys%energy_order)
+		if (allocated(sys%maxoccs)) deallocate(sys%maxoccs)
+		if (allocated(sys%minoccs)) deallocate(sys%minoccs)
 	end subroutine sysdata_free
 	
 	real(dbl) function	compute_kfcn(sys, occs) result(kfcn)
