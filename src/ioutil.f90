@@ -4,13 +4,15 @@ module ioutil
 	implicit none
 	
 	type memorymanager
-		real(dbl) 							  :: max_memory
+		real(dbl) 							  :: max_memory, threshold
 		integer								  :: nrecords, current_record, nlevels, chunk_size
 		integer, dimension(:, :), allocatable :: current_block
+		character(len=10)					  :: screening_type	
+		logical								  :: keep_top
 	contains
 		procedure	:: initialise => mm_init
 		procedure	:: record_name => mm_record_name
-		!procedure	:: block_swap => mm_block_swap
+		procedure	:: block_swap => mm_block_swap
 		procedure	:: sort_and_screen => mm_sort_and_screen
 		procedure	:: write_to_bin => mm_write_to_bin
 		procedure	:: read_from_bin => mm_read_from_bin
@@ -59,7 +61,7 @@ contains
 		integer					:: temp_ix		  ! temp index
 		real(dbl), dimension(n) :: b, c 		  ! temp arrays
 		real(dbl) 				:: random_real    ! random number
-			integer				:: random_ix 	  ! random index
+		integer					:: random_ix 	  ! random index
 		
 		if (n .eq. 1) then
 			return
@@ -105,18 +107,19 @@ contains
 		end if 
 		
 		if (m .gt. 0) then
-			call quicksort(p-k, inlist(n-p+k+1:n), indices(n-p+k+1:n))
+			j = n-p+k+1
+			call quicksort(p-k, inlist(j:n), indices(j:n))
 		end if
 		
 	contains
 		subroutine swap(ix, jx)
 			integer, intent(in) :: ix, jx
-			temp_real = inlist(ix)
-			temp_ix   = indices(ix)
-			inlist(ix) = inlist(jx)
-			inlist(jx) = temp_real
-			indices(ix) = indices(jx)
-			indices(jx) = temp_ix
+			temp_real     = inlist(ix)
+			temp_ix       = indices(ix)
+			inlist(ix)    = inlist(jx)
+			inlist(jx)    = temp_real
+			indices(ix)   = indices(jx)
+			indices(jx)   = temp_ix
 		end subroutine swap
 	end subroutine quicksort
 	
@@ -143,6 +146,9 @@ contains
 		real(dbl) :: mem_estimate
 		
 		mm%nlevels = n
+		mm%screening_type = 'fc' ! default to Franck-Condon screening
+		mm%threshold = 1D-12 ! threshold for screening 
+		mm%keep_top = .false.
 		
 		! maximum memory availale in GB
 		if (max_mem .gt. 0d0) then
@@ -157,12 +163,11 @@ contains
 		mem_estimate = (mem_estimate * real(max_noccs)) / (1024d0**3)
 		mm%nrecords = ceiling(mem_estimate / mm%max_memory)	
 		mm%chunk_size = ceiling(real(max_noccs) / real(mm%nrecords))
-		write(*, *) mm%chunk_size
 		mm%current_record = 1	
 		
 		write(*, '(A33,F15.3,A3)') 'Initalised memory manager with:', mm%max_memory, 'GB'
 		write(*, '(A33,F15.3,A3)') 'Maximum memory needed (estimate):', mem_estimate, 'GB'
-		write(*, '(A12,I10,A8)') 'Anticipating', mm%nrecords, 'records'
+		write(*, '(A12,I10,A13,I10,A12)') 'Anticipating', mm%nrecords, 'records with', mm%chunk_size, 'occs each'
 	end subroutine mm_init
 	
 	subroutine mm_record_name(mm, filename, record)
@@ -213,18 +218,59 @@ contains
 		end do main
 	end subroutine mm_sort_and_screen
 	
-	subroutine mm_write_to_bin(mm, n, occs)
+	subroutine mm_block_swap(mm, levels, hrfactors)
+		class(memorymanager), intent(inout)				:: mm
+		real(dbl), dimension(mm%nlevels), intent(in)	:: levels, hrfactors
+		
+		integer	:: max_ix, ix
+		integer, dimension(mm%chunk_size) :: indices
+		integer, dimension(mm%nlevels)	  :: tmp_occ
+		
+		! check if there is currently a block
+		if (allocated(mm%current_block)) then
+			! sort and screen the block
+			write(*, *)
+			write(*, '(A15,I5,A16,1X,A10)') 'Sorting record', mm%current_record, 'screening by', mm%screening_type
+			select case(mm%screening_type)
+			case ('energy')
+				call mm%sort_and_screen(levels, hrfactors, mm%threshold, max_ix, indices, energy)
+			case default
+				call mm%sort_and_screen(levels, hrfactors, mm%threshold, max_ix, indices, franck_condon)
+			end select
+			
+			! we now only need to write the current block to file up to max_ix
+			call mm%write_to_bin(mm%current_block, indices(:max_ix))
+			! reset the block and increment counter
+			mm%current_record = mm%current_record + 1
+			if (mm%keep_top .and. (max_ix .lt. mm%chunk_size)) then
+				! stochastic case need to keep the 'top' records
+				mm%current_block(:, max_ix+1:) = 0
+			else 
+				mm%current_block = 0
+			end if 
+		else
+			! allocate the first block
+			allocate(mm%current_block(mm%nlevels, mm%chunk_size))
+			mm%current_block = 0 ! initialise
+		end if
+	end subroutine mm_block_swap
+	
+	subroutine mm_write_to_bin(mm, occs, indices)
 		class(memorymanager), intent(inout)		:: mm
-		integer, intent(in)						:: n
 		integer, dimension(:, :), intent(in) 	:: occs
+		integer, dimension(:), intent(in)		:: indices
 		
 		character(len=100) :: filename
 		integer	:: ios
 		
 		call mm%record_name(filename, mm%current_record)
-		mm%current_record = mm%current_record + 1
 		open(unit=occs_unit, file=filename, form='unformatted', access='stream')
-		write(occs_unit, iostat=ios) occs
+		
+		if (size(indices) .eq. 0) then
+			write(occs_unit, iostat=ios) occs
+		else
+			write(occs_unit, iostat=ios) occs(:, indices(:))
+		end if
 		close(occs_unit)
 		
 		if (ios .ne. 0) then
@@ -289,4 +335,19 @@ contains
 		energy = dot_product(occs, levels)
 	end function energy
 	
+	function franck_condon(n, levels, hrfactors, occs)
+		integer, intent(in)					:: n
+		real(dbl), dimension(n), intent(in) :: levels, hrfactors
+		integer, dimension(n), intent(in) 	:: occs
+		real(dbl)							:: franck_condon
+		
+		integer 	:: ix
+		real(dbl) 	:: tmp
+		franck_condon = 1d0
+		do ix=1,n
+			tmp = exp(hrfactors(ix)) * (hrfactors(ix) ** occs(ix)) / factorial(occs(ix))
+			franck_condon =  franck_condon * tmp
+		end do
+		franck_condon = sqrt(franck_condon)
+	end function franck_condon
 end module ioutil
