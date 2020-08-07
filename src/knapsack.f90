@@ -9,7 +9,7 @@ contains
 		integer, intent(in)					:: n
 		real(dbl), intent(in) 				:: capacity
 		real(dbl), dimension(n), intent(in)	:: values
-		integer, dimension(n), intent(out)  :: res
+		integer(smallint), dimension(n), intent(out)  :: res
 		
 		integer									:: maxcap, w, ix, jx, err
 		real(dbl)								:: wt
@@ -52,7 +52,7 @@ contains
 		real(dbl), intent(in)				:: capacity, epsilon
 		integer, intent(in)					:: n
 		real(dbl), dimension(n), intent(in) :: values
-		integer, dimension(n), intent(out)  :: res
+		integer(smallint), dimension(n), intent(out)  :: res
 		real(dbl), intent(out)				:: sumres
 		
 		real(dbl)				:: K
@@ -69,7 +69,7 @@ contains
 	subroutine expand(n, energies, occs, res)
 		integer, intent(in)								  :: n
 		real(dbl), dimension(n), intent(in) 			  :: energies
-		integer, dimension(n), intent(in)  				  :: occs
+		integer(smallint), dimension(n), intent(in)  				  :: occs
 		real(dbl), allocatable, dimension(:), intent(out) :: res
 		
 		integer	:: ix, jx, ctr, ntot
@@ -87,9 +87,9 @@ contains
 	
 	subroutine contract(nbase, ntot, base, total, res)
 		integer, intent(in) 			  	   :: nbase, ntot
-		integer, dimension(nbase), intent(in)  :: base
-		integer, dimension(ntot), intent(in)   :: total
-		integer, dimension(nbase), intent(out) :: res
+		integer(smallint), dimension(nbase), intent(in)  :: base
+		integer(smallint), dimension(ntot), intent(in)   :: total
+		integer(smallint), dimension(nbase), intent(out) :: res
 		
 		integer	:: ctr, ix, jx
 		ctr = 1
@@ -103,12 +103,12 @@ contains
 		integer, intent(in)					:: n
 		real(dbl), intent(in) 				:: capacity, epsilon
 		real(dbl), dimension(n), intent(in)	:: energies
-		integer, dimension(n), intent(in)	:: occs
-		integer, dimension(n), intent(out)  :: res
+		integer(smallint), dimension(n), intent(in)	:: occs
+		integer(smallint), dimension(n), intent(out)  :: res
 		real(dbl), intent(out)				:: sumres
 		
 		integer								 :: ntot
-		integer, allocatable, dimension(:) 	 :: tempres
+		integer(smallint), allocatable, dimension(:) 	 :: tempres
 		real(dbl), allocatable, dimension(:) :: totvalues
 		
 		call expand(n, energies, occs, totvalues)
@@ -120,94 +120,102 @@ contains
 		deallocate(totvalues)
 	end subroutine knap_n
 	
-	recursive subroutine iterate(n, noccs, values, max_occs, min_occs, emax, emin, occ, ix, occlist, enlist, occix, checked, maxnocc)
-		integer, intent(in)								:: n, ix
-		integer(bigint), intent(in)						:: noccs, maxnocc
-		integer(bigint), intent(inout)					:: occix, checked
-		integer, dimension(n), intent(in) 				:: max_occs, min_occs
-		integer, dimension(n), intent(inout)			:: occ
-		real(dbl), dimension(n), intent(in) 			:: values
-		integer, dimension(n, noccs), intent(inout) 	:: occlist
-		real(dbl), dimension(noccs), intent(inout)		:: enlist
-		real(dbl), intent(in)							:: emax, emin
+	recursive subroutine iterate(sys, noccs, emax, emin, occ, ix, enlist, occix, checked, maxnocc)
+		type(sysdata), intent(inout)							:: sys
+		integer, intent(in)										:: ix
+		integer(bigint), intent(in)								:: noccs, maxnocc
+		integer(bigint), intent(inout)							:: occix, checked
+		integer(smallint), dimension(sys%nlevels), intent(inout)	:: occ
+		real(dbl), dimension(noccs), intent(inout)				:: enlist
+		real(dbl), intent(in)									:: emax, emin
 		
-		integer		:: i
+		integer		:: i, n
 		real(dbl) 	:: en
-		do i=min_occs(ix),max_occs(ix)
+		
+		n = sys%nlevels
+		do i=sys%minoccs(ix),sys%maxoccs(ix)
 			occ(ix) = i
 			
 			if (ix .lt. n) then
-				call iterate(n, noccs, values, max_occs, min_occs, emax, emin, occ, ix+1, occlist, enlist, occix, checked, maxnocc)
+				call iterate(sys, noccs, emax, emin, occ, ix+1, enlist, occix, checked, maxnocc)
 			else
-				en = dot_product(values, occ)
+				en = dot_product(sys%energies, occ)
 				if ((en .lt. emax) .and. (en .gt. emin)) then
-					occlist(1:n, occix) = occ(1:n)
+					sys%mm%current_block(1:n, occix) = occ(1:n)
 					enlist(occix) = en
 					occix = occix+1
+					if (modulo(occix, 100000) .eq. 0) write(*, *) occix
+					if (occix .gt. sys%mm%chunk_size) then
+						write(*, '(1x,a,1x,i10)') 'Finished block', sys%mm%current_record
+						call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=sys%mm%chunk_size)
+						if (sys%do_write) then
+							call sys%mm%block_swap(sys%energies, sys%hrfactors)
+						else
+							sys%mm%current_record = sys%mm%current_record + 1
+							sys%mm%current_block = 0
+						end if
+						occix = 1
+					end if
 				end if
 				checked = checked + 1
-				if (mod(checked, print_frequency) .eq. 1) call progress_bar_time(checked, maxnocc)
+				!if (mod(checked, print_frequency) .eq. 1) call progress_bar_time(checked, maxnocc)
 			end if
 		end do		
 	end subroutine iterate
 	
-	subroutine brute_force(sys, emax, emin, occlist, enlist, noccs)
-		type(sysdata), intent(in)							:: sys
+	subroutine brute_force(sys, emax, emin, enlist, noccs)
+		type(sysdata), intent(inout)						:: sys
 		real(dbl), intent(in)								:: emax, emin
-		integer, allocatable, dimension(:, :), intent(out)	:: occlist
 		real(dbl), allocatable, dimension(:), intent(out)	:: enlist
 		integer(bigint), intent(out)						:: noccs
 		
 		integer(bigint) :: max_nocc, occsize, checked
-		integer	:: cocc(sys%nlevels), ix
+		integer(smallint)	:: cocc(sys%nlevels)
+		integer :: ix
 		cocc = 0
 		cocc(1) = max(sys%minoccs(1), 1)
 		max_nocc = sys%maxnoccs
-		occsize = max_nocc / 10
+		occsize = sys%mm%chunk_size
 		
-		allocate(occlist(sys%nlevels, occsize))
 		allocate(enlist(occsize))
 		noccs = 1
 		checked = 0
 		write(*, '(1x,a,1x,e12.4,1x,a)') 'Estimated', real(max_nocc), 'occupations to check'
-		call iterate(sys%nlevels, occsize, sys%energies, sys%maxoccs, sys%minoccs,&
-			 		 emax, emin, cocc, 1, occlist, enlist, noccs, checked, max_nocc)
-		call progress_bar_time(max_nocc, max_nocc)
+		call iterate(sys, occsize, emax, emin, cocc, 1, enlist, noccs, checked, max_nocc)
+		!call progress_bar_time(max_nocc, max_nocc)
 		write(*, *)
 	end subroutine brute_force
 	
-	subroutine screened_brute_force(sys, emax, emin, occlist, enlist, noccs, worst_case)
-		type(sysdata), intent(in)							:: sys
+	subroutine screened_brute_force(sys, emax, emin, enlist, noccs, worst_case)
+		type(sysdata), intent(inout)						:: sys
 		real(dbl), intent(in)								:: emax, emin
-		integer, allocatable, dimension(:, :), intent(out)	:: occlist
 		real(dbl), allocatable, dimension(:), intent(out)	:: enlist
 		integer(bigint), intent(in)							:: worst_case
 		integer(bigint), intent(out)						:: noccs
 		
 		integer(bigint)	:: max_nocc, occsize, checked
-		integer	:: cocc(sys%nlevels), ix
+		integer(smallint)	:: cocc(sys%nlevels)
+		integer :: ix
 		cocc = 0
 		cocc(1) = sys%cutoffs(1, sys%nthresh+1)
 		max_nocc = sys%maxnoccs
-		occsize = max_nocc / 2
+		occsize = sys%mm%chunk_size
 		
-		allocate(occlist(sys%nlevels, occsize))
 		allocate(enlist(occsize))
 		noccs = 1
 		checked = 0
 		write(*, '(1x,a,1x,e12.4,1x,a,e12.4)') 'Estimated', real(max_nocc), 'occupations to check of a possible', real(worst_case)
-		call screened_iterate(sys, occsize, emax, emin, cocc, 1, occlist, enlist, noccs, checked, max_nocc)
-		call progress_bar_time(max_nocc, max_nocc)
+		call screened_iterate(sys, occsize, emax, emin, cocc, 1, enlist, noccs, checked, max_nocc)
+		!call progress_bar_time(max_nocc, max_nocc)
 		write(*, *)
 	end subroutine screened_brute_force
 	
-	recursive subroutine screened_iterate(sys, noccs, emax, emin, occ, ix, occlist, enlist, occix, checked, maxnocc)
-		type(sysdata), intent(in)								:: sys
+	recursive subroutine screened_iterate(sys, noccs, emax, emin, occ, ix, enlist, occix, checked, maxnocc)
+		type(sysdata), intent(inout)							:: sys
 		integer, intent(in)										:: ix
 		integer(bigint), intent(in)								:: noccs, maxnocc
 		integer(bigint), intent(inout)							:: occix, checked
-		integer, dimension(sys%nlevels), intent(inout)			:: occ
-		integer, dimension(sys%nlevels, noccs), intent(inout) 	:: occlist
+		integer(smallint), dimension(sys%nlevels), intent(inout)			:: occ
 		real(dbl), dimension(noccs), intent(inout)				:: enlist
 		real(dbl), intent(in)									:: emax, emin
 		
@@ -219,19 +227,30 @@ contains
 				occ(ix) = i
 				en = dot_product(sys%energies, occ)
 				if ((en .lt. emax) .and. (en .gt. emin)) then
-					occlist(:, occix) = occ(:)
+					sys%mm%current_block(:, occix) = occ(:)
 					enlist(occix) = en
 					occix = occix+1
+					if (occix .gt. sys%mm%chunk_size) then
+						write(*, '(1x,a,1x,i10)') 'Finished block', sys%mm%current_record
+						call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=sys%mm%chunk_size)
+						if (sys%do_write) then
+							call sys%mm%block_swap(sys%energies, sys%hrfactors)
+						else
+							sys%mm%current_record = sys%mm%current_record + 1
+							sys%mm%current_block = 0
+						end if
+						occix = 1
+					end if
 				end if
 				checked = checked + 1
-				if (mod(checked, print_frequency) .eq. 1) call progress_bar_time(checked, maxnocc)
+				!if (mod(checked, print_frequency) .eq. 1) call progress_bar_time(checked, maxnocc)
 			end do
 		else
 			do i=0,maxix
 				occ(ix) = i
 				call sys%get_next_bound(occ, ix, bnd)
 				occ(ix+1) = sys%cutoffs(ix+1, bnd)
-				call screened_iterate(sys, noccs, emax, emin, occ, ix+1, occlist, enlist, occix, checked, maxnocc)
+				call screened_iterate(sys, noccs, emax, emin, occ, ix+1, enlist, occix, checked, maxnocc)
 			end do
 		end if
 	end subroutine screened_iterate

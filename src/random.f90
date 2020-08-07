@@ -1,11 +1,11 @@
 module random
-	use constants, only : dbl
+	use constants, only : dbl, bigint
 	implicit none
 contains
 	function random_int(min, max)
-		integer, intent(in) :: min
-		integer, intent(in) :: max
-		integer				:: random_int
+		integer(bigint), intent(in) :: min
+		integer(bigint), intent(in) :: max
+		integer(bigint)		:: random_int
 		real(dbl)			:: rn, scale 
 		
 		rn     = rand()
@@ -14,11 +14,11 @@ contains
 	end function random_int
 	
 	subroutine n_random_ints(n, min, max, res)
-		integer, intent(in)					:: n, min, max
-		integer, dimension(n), intent(out) 	:: res
+		integer(bigint), intent(in)							:: n, min, max
+		integer(bigint), dimension(n), intent(out) 	:: res
 		
 		real(dbl)	:: rn, scale
-		integer		:: ix
+		integer(bigint)		:: ix
 		scale = max - min
 		do ix=1, n
 			rn = rand()
@@ -27,16 +27,17 @@ contains
 	end subroutine n_random_ints
 	
 	subroutine n_random_ints_weighted(n, nvals, plusminus, weights, res)
-		integer, intent(in)							:: n, nvals
-		integer, dimension(2), intent(in)			:: plusminus
+		integer(bigint), intent(in)							:: n, nvals
+		integer(bigint), dimension(2), intent(in)			:: plusminus
 		real(dbl), dimension(nvals), intent(inout)	:: weights
-		integer, dimension(n), intent(out) 			:: res
+		integer(bigint), dimension(n), intent(out) 	:: res
 		
-		integer, dimension(:), allocatable	:: expanded_ints
-		integer								:: mults(nvals), posres(n), negres(n)
-		integer								:: ix, nt, ctr, pmmin
+		integer(bigint), dimension(:), allocatable	:: expanded_ints
+		integer(bigint)						:: mults(nvals), posres(n), negres(n)
+		integer(bigint)								:: ix, nt, ctr, pmmin, unity
 		
 		pmmin = min(plusminus(1), plusminus(2))
+		unity = 1
 		
 		! Prob distribution for adding occupations
 		weights = log10(weights / minval(weights))
@@ -48,7 +49,7 @@ contains
 			expanded_ints(ctr:ctr+mults(ix)-1) = ix
 			ctr = ctr + mults(ix)
 		end do 
-		call n_random_ints(plusminus(1), 1, nt, posres)
+		call n_random_ints(plusminus(1), unity, nt, posres)
 		do ix=1,pmmin
 			res(2*ix-1) = expanded_ints(posres(ix))
 		end do
@@ -64,7 +65,7 @@ contains
 			expanded_ints(ctr:ctr+mults(ix)-1) = ix
 			ctr = ctr + mults(ix)
 		end do 
-		call n_random_ints(plusminus(2), 1, nt, negres)
+		call n_random_ints(plusminus(2), unity, nt, negres)
 		do ix=1,pmmin
 			res(2*ix) = expanded_ints(negres(ix))
 		end do

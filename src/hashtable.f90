@@ -1,5 +1,5 @@
 module hashtbl
-	use constants, only : dbl
+	use constants, only : dbl, smallint
 	implicit none
 	integer, parameter :: tbl_size = 50
 	

@@ -1,9 +1,10 @@
 module constants
-	use iso_fortran_env, only: real64, int64
+	use iso_fortran_env, only: real64, int64, int16
 	
 	implicit none
 	integer, parameter 		:: dbl = real64
 	integer, parameter		:: bigint = int64
+	integer, parameter		:: smallint = int16
 	integer, parameter		:: maxnchange = 10
 	integer, parameter		:: main_input_unit = 15
 	integer, parameter		:: bfile_unit = 16

@@ -1,8 +1,9 @@
 calculation,	nonradiative
+memory,		2
 algorithm,	hybrid
 weighting,	fc
 energy,		0.107768
-debug,		1
+debug,		0
 deltae,		0.04
 natoms,		20
 bfile,		Bvectors.dat

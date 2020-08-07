@@ -1,5 +1,5 @@
 module sample
-	use constants, only : dbl, bigint, damping, maxnchange, n_guesses, print_frequency
+	use constants
 	use ioutil, only : energy
 	use random
 	use progress, only : progress_bar_time
@@ -27,7 +27,7 @@ contains
 		real(dbl), dimension(n), intent(in)				:: values
 		integer(bigint), intent(inout)					:: noccs
 		real(dbl), intent(in)							:: emin, emax
-		integer, dimension(n, nsamples), intent(inout)	:: occlist
+		integer(smallint), dimension(n, nsamples), intent(inout)	:: occlist
 		real(dbl), dimension(nsamples), intent(inout)	:: enlist
 		type(hash_tbl_sll), intent(inout)				:: tbl
 			
@@ -48,7 +48,7 @@ contains
 	
 	subroutine uniform_indices(sys, occ, plusminus, indices)
 		type(sysdata), intent(in)						:: sys
-		integer, dimension(sys%nlevels), intent(in)		:: occ
+		integer(smallint), dimension(sys%nlevels), intent(in)		:: occ
 		integer, dimension(2), intent(out)				:: plusminus
 		integer, dimension(2*maxnchange), intent(out)	:: indices
 		call n_random_ints(2, 1, maxnchange, plusminus)
@@ -57,7 +57,7 @@ contains
 	
 	subroutine weighted_indices(sys, occ, plusminus, indices)
 		type(sysdata), intent(in)						:: sys
-		integer, dimension(sys%nlevels), intent(in)		:: occ
+		integer(smallint), dimension(sys%nlevels), intent(in)		:: occ
 		integer, dimension(2), intent(out)				:: plusminus
 		integer, dimension(2*maxnchange), intent(out)	:: indices
 
@@ -72,20 +72,20 @@ contains
 	
 	subroutine do_sample(sys, guesses, occs, guess_ens, emin, emax, ixfunc, tbl, occlist, enlist, noccs)
 		type(sysdata), intent(in)									:: sys
-		integer, dimension(sys%nlevels), intent(in)					:: occs
-		integer, dimension(n_guesses, sys%nlevels), intent(in)		:: guesses
+		integer(smallint), dimension(sys%nlevels), intent(in)					:: occs
+		integer(smallint), dimension(n_guesses, sys%nlevels), intent(in)		:: guesses
 		real(dbl), intent(in)										:: emin, emax
 		real(dbl), dimension(n_guesses), intent(in)					:: guess_ens
-		integer, dimension(sys%nlevels, sys%nsamples), intent(out)	:: occlist
+		integer(smallint), dimension(sys%nlevels, sys%nsamples), intent(out)	:: occlist
 		real(dbl), dimension(sys%nsamples), intent(out)				:: enlist
 		integer(bigint), intent(out)								:: noccs
 		type(hash_tbl_sll), intent(out)								:: tbl
 			
 		interface
 			subroutine ixfunc(sys, occ, plusminus, indices)
-				import :: sysdata, maxnchange
+				import :: sysdata, maxnchange, smallint
 				type(sysdata), intent(in)						:: sys
-				integer, dimension(sys%nlevels), intent(in)		:: occ
+				integer(smallint), dimension(sys%nlevels), intent(in)		:: occ
 				integer, dimension(2), intent(out)				:: plusminus
 				integer, dimension(2*maxnchange), intent(out)	:: indices
 			end subroutine
@@ -135,7 +135,7 @@ contains
 	
 	subroutine get_hash(n, occ, hash_str)
 		integer, intent(in) 						:: n
-		integer, dimension(n), intent(in)			:: occ
+		integer(smallint), dimension(n), intent(in)	:: occ
 		character(len=:), allocatable, intent(out)	:: hash_str
 		
 		character(len=20)	:: fmt
@@ -149,7 +149,7 @@ contains
 	
 	subroutine get_unique(n, nocc, occlist, tbl, nunique)
 		integer, intent(in)						:: n, nocc
-		integer, dimension(n, nocc), intent(in)	:: occlist
+		integer(smallint), dimension(n, nocc), intent(in)	:: occlist
 		integer, intent(out)					:: nunique
 		type(hash_tbl_sll), intent(out)			:: tbl
 		

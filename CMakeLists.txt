@@ -24,11 +24,11 @@ include_directories(${MPI_INCLUDE_PATH})
 
 # we need at least F03
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-    set(dialect "-ffree-form -fbackslash -fimplicit-none -Wno-tabs")
+    set(dialect "-ffree-form -fbackslash -fimplicit-none -fdefault-integer-8 -Wno-tabs")
     set(bounds "-fbounds-check")
 endif()
 if(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
-    set(dialect "-stand f03 -free -implicitnone -backslash")
+    set(dialect "-stand f03 -free -i8 -implicitnone -backslash")
     set(bounds "-check bounds")
 endif()
 if(CMAKE_Fortran_COMPILER_ID MATCHES "PGI")

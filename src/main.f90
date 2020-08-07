@@ -1,5 +1,5 @@
 program main
-	use constants, only : dbl, bigint, TO_EV, RAD_CONVERT, n_guesses, n_cut_guess, format_time
+	use constants
 	use nonradiative
 	use radiative
 	use sample
@@ -8,11 +8,11 @@ program main
 	character(len=100)						:: arg
 	integer									:: ios
 	type(sysdata)							:: sys
-	integer, dimension(:, :), allocatable 	:: occlist
+	integer(smallint), dimension(:, :), allocatable 	:: occlist
 	real(dbl), dimension(:), allocatable	:: enlist
-	integer, dimension(:, :), allocatable	:: guesses
-	integer									:: ix
-	integer(bigint)							:: noccs, worst_case
+	integer(smallint), dimension(:, :), allocatable	:: guesses
+	integer									:: ix, noccs
+	integer(bigint)							:: worst_case, bignoccs
 	real(dbl)								:: emin, emax, start, finish, target_en
 	real(dbl), dimension(n_guesses)			:: guess_ens
 	type(hash_tbl_sll) 						:: tbl
@@ -77,9 +77,12 @@ program main
 			noccs = 0
 			write (*, '(1x,a,f10.6,1x,a,1x,f10.6,1x,a)') 'Searching for occs with E(n) between', emin, 'and', emax, 'eV'
 			write (*, '(1x,a,a,1x,a,i2)') 'Using algorithm: ', trim(sys%algorithm), 'with ncut = ', sys%ncut
+			allocate(occlist(sys%nlevels, 1))
+			occlist = 0
+			call sys%calculate_kic(1, occlist, init=.true., stopix=0)
 			select case (sys%algorithm)
 			case ('brute')
-				call brute_force(sys, emax, emin, occlist, enlist, noccs)
+				call brute_force(sys, emax, emin, enlist, noccs)
 			case ('stochastic')
 				sys%maxoccs = [(min(n_cut_guess, sys%cutoffs(ix, sys%nthresh+1)), ix=1,sys%nlevels)]
 				allocate(guesses(n_guesses, sys%nlevels))
@@ -95,20 +98,29 @@ program main
 				allocate(enlist(sys%nsamples))
 				select case (sys%weighting)
 				case ('fc')
-					call do_sample(sys, guesses, sys%maxoccs, guess_ens, emin, emax, weighted_indices, tbl, occlist, enlist, noccs)
+					call do_sample(sys, guesses, sys%maxoccs, guess_ens, emin, emax, weighted_indices, tbl, occlist, enlist, bignoccs)
 				case default
-					call do_sample(sys, guesses, sys%maxoccs, guess_ens, emin, emax, uniform_indices, tbl, occlist, enlist, noccs)
+					call do_sample(sys, guesses, sys%maxoccs, guess_ens, emin, emax, uniform_indices, tbl, occlist, enlist, bignoccs)
 				end select
-				noccs = noccs + 1
+				bignoccs = bignoccs + 1
 			case default
 				worst_case = sys%maxnoccs 
-				call screened_brute_force(sys, emax, emin, occlist, enlist, noccs, worst_case)
+				call screened_brute_force(sys, emax, emin, enlist, noccs, worst_case)
 			end select
-			noccs = noccs - 1
-			write (*, '(1x,a,1x,i10,1x,a)') 'Found', noccs, 'occs'
+			write(*, '(1x,a,1x,i10)') 'Finished block', sys%mm%current_record
+			call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=noccs-1)
+			if (sys%do_write) then
+				call sys%mm%block_swap(sys%energies, sys%hrfactors)
+			else
+				sys%mm%current_record = sys%mm%current_record + 1
+				sys%mm%current_block = 0
+			end if
+			
+			write (*, '(1x,a,1x,i10,1x,a)') 'Found approximately', (sys%mm%current_record-1)*sys%mm%chunk_size, 'occs'
 			write (*, *)
 			write (*, *) 'Calculating non-radiative rate'
-			call sys%calculate_kic(noccs, occlist, init=.true.)
+			sys%k_ic = 4d0 * sys%k_ic / sys%gamma 
+			!call sys%calculate_kic(noccs, occlist, init=.true.)
 			write (*, '(1x,a,1x,e14.8,1x,a)') 'k_ic =', sys%k_ic, 's-1'
 			write (*, *)
 		end if

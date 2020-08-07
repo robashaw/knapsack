@@ -4,19 +4,19 @@ module nonradiative
 	implicit none
 	
 	type sysdata
-		logical										:: do_rad, do_nonrad
-		integer										:: ncut, nthresh, nlevels, nsamples, natoms, debug_level
-		integer(bigint)								:: maxnoccs
-		character(len=100)							:: bfile, gradfile, algorithm, weighting
-		character(len=100)							:: radfile, calctype, radunits, sortby
-		real(dbl)									:: k_ic, k_r, e_target, delta_e, gamma, tdm, memory
-		real(dbl), dimension(:), allocatable		:: energies, hrfactors, masses, V_vq_j
-		real(dbl), dimension(:, :), allocatable		:: fcfactors
-		real(dbl), dimension(:, :, :), allocatable	:: Bvqj
-		integer, dimension(:, :), allocatable		:: cutoffs, bounds
-		integer, dimension(:), allocatable			:: energy_order
-		integer, dimension(:), allocatable			:: minoccs, maxoccs
-		type(memorymanager)							:: mm
+		logical											:: do_rad, do_nonrad, do_write
+		integer											:: ncut, nthresh, nlevels, nsamples, natoms, debug_level
+		integer(bigint)									:: maxnoccs
+		character(len=100)								:: bfile, gradfile, algorithm, weighting
+		character(len=100)								:: radfile, calctype, radunits, sortby
+		real(dbl)										:: k_ic, k_r, e_target, delta_e, gamma, tdm, memory
+		real(dbl), dimension(:), allocatable			:: energies, hrfactors, masses, V_vq_j
+		real(dbl), dimension(:, :), allocatable			:: fcfactors
+		real(dbl), dimension(:, :, :), allocatable		:: Bvqj
+		integer, dimension(:, :), allocatable			:: cutoffs, bounds
+		integer, dimension(:), allocatable				:: energy_order
+		integer(smallint), dimension(:), allocatable	:: minoccs, maxoccs
+		type(memorymanager)								:: mm
 	contains
 		procedure	:: from_file => sysdata_from_file
 		procedure	:: init => sysdata_init
@@ -52,6 +52,7 @@ contains
 	    ! detected.  ios is zero otherwise.
 
 		sys%debug_level = 0
+		sys%do_write = .false.
 		sys%memory = 0.5d0
 	    do while (ios == 0)
 	       read(main_input_unit, '(A)', iostat=ios) buffer
@@ -92,6 +93,8 @@ contains
    	             read(buffer, *, iostat=ios) sys%debug_level
 	          case ('ncut')
 	             read(buffer, *, iostat=ios) sys%ncut
+			  case ('tofile')
+			  	 read(buffer, *, iostat=ios) sys%do_write
    	          case ('natoms')
    	             read(buffer, *, iostat=ios) sys%natoms
 	          case ('nthresh')
@@ -161,7 +164,8 @@ contains
 			sys%maxoccs = [(sys%cutoffs(ix, sys%nthresh+1), ix=1,sys%nlevels)]
 			sys%maxnoccs = ncombinations(sys%nlevels, sys%maxoccs, sys%minoccs)
 			
-			call sys%mm%initialise(sys%nlevels, sys%maxnocss, sys%memory)
+			call sys%mm%initialise(sys%nlevels, sys%maxnoccs, sys%memory)
+			call sys%mm%block_swap(sys%energies, sys%hrfactors)
 		end if
 	end subroutine sysdata_init
 	
@@ -245,7 +249,7 @@ contains
 	
 	real(dbl) function	compute_kfcn(sys, occs) result(kfcn)
 		class(sysdata), intent(in) 					:: sys
-		integer, dimension(sys%nlevels), intent(in)	:: occs
+		integer(smallint), dimension(sys%nlevels), intent(in)	:: occs
 		
 		integer :: ix
 		kfcn = 1d0
@@ -256,7 +260,7 @@ contains
 	
 	subroutine sysdata_compute_zn(sys, occs, res)
 		class(sysdata), intent(inout)					:: sys
-		integer, dimension(sys%nlevels), intent(in)		:: occs
+		integer(smallint), dimension(sys%nlevels), intent(in)		:: occs
 		real(dbl), dimension(sys%nlevels), intent(out)	:: res
 		
 		integer		:: jx
@@ -338,11 +342,12 @@ contains
 		sys%gamma = SQRT_8LN2 * sqrt(sys%gamma)
 	end subroutine sysdata_calc_gamma
 	
-	subroutine sysdata_calc_kic(sys, noccs, occs, init)
+	subroutine sysdata_calc_kic(sys, noccs, occs, init, stopix)
 		class(sysdata), intent(inout)						:: sys
 		integer(bigint), intent(in)							:: noccs
-		integer, dimension(sys%nlevels, noccs), intent(in)	:: occs
+		integer(smallint), dimension(sys%nlevels, noccs), intent(in)	:: occs
 		logical, intent(in)									:: init
+		integer, intent(in)									:: stopix
 		
 		integer			:: nx, ix
 		integer(bigint)	:: counter(20)
@@ -358,7 +363,7 @@ contains
 			call sys%calculate_gamma
 		end if
 		
-		do nx=1,noccs
+		do nx=1,stopix
 			call sys%compute_zn(occs(:, nx), res)
 			tmp = dot_product(res, sys%V_vq_j)
 			tmp = tmp**2
@@ -393,12 +398,11 @@ contains
 			end do
 		end if
 		
-		sys%k_ic = 4d0 * sys%k_ic / sys%gamma 
 	end subroutine sysdata_calc_kic
 	
 	subroutine sysdata_get_next_bound(sys, occ, ix, bnd)
 		class(sysdata), intent(in)					:: sys
-		integer, dimension(sys%nlevels), intent(in)	:: occ
+		integer(smallint), dimension(sys%nlevels), intent(in)	:: occ
 		integer, intent(in)							:: ix
 		integer, intent(out)						:: bnd
 		
@@ -415,7 +419,7 @@ contains
 		class(sysdata), intent(in)		:: sys
 		integer(bigint), intent(out)	:: maxnocc
 		
-		integer :: ix, occ(sys%nlevels)
+		integer(smallint) :: occ(sys%nlevels)
 		maxnocc = 0
 		occ = 0
 		occ(1) = sys%cutoffs(1, sys%nthresh+1)
@@ -426,7 +430,7 @@ contains
 		type(sysdata), intent(in)						:: sys
 		integer(bigint), intent(out) 					:: maxnocc 
 		integer, intent(in)								:: ix
-		integer, dimension(sys%nlevels), intent(inout)	:: occ
+		integer(smallint), dimension(sys%nlevels), intent(inout)	:: occ
 		
 		integer :: maxix, jx, bnd
 		integer(bigint) :: tmpmax

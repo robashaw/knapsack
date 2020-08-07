@@ -5,8 +5,9 @@ module ioutil
 	
 	type memorymanager
 		real(dbl) 							  :: max_memory, threshold
-		integer								  :: nrecords, current_record, nlevels, chunk_size
-		integer, dimension(:, :), allocatable :: current_block
+		integer								  :: nrecords, current_record, nlevels
+		integer(bigint)					      :: chunk_size
+		integer(smallint), dimension(:, :), allocatable :: current_block
 		character(len=10)					  :: screening_type	
 		logical								  :: keep_top
 	contains
@@ -25,7 +26,7 @@ contains
 		! yielding the sorted outlist, and the order
 		! of the indices going from out to in
 		! sorts in ASCENDING order
-		integer, intent(in)						:: n
+		integer(bigint), intent(in)				:: n
 		real(dbl), dimension(n), intent(in)		:: inlist 
 		real(dbl), dimension(n), intent(out)	:: outlist
 		integer, dimension(n), intent(out)		:: indices
@@ -52,7 +53,7 @@ contains
 	
 	recursive subroutine quicksort(n, inlist, indices) 
 		! NOTE: sorts in ASCENDING order of inlist 
-		integer, intent(in)						:: n
+		integer(bigint), intent(in)				:: n
 		real(dbl), dimension(n), intent(inout)	:: inlist
 		integer, dimension(n), intent(out)		:: indices
 		
@@ -113,7 +114,7 @@ contains
 		
 	contains
 		subroutine swap(ix, jx)
-			integer, intent(in) :: ix, jx
+			integer(bigint), intent(in) :: ix, jx
 			temp_real     = inlist(ix)
 			temp_ix       = indices(ix)
 			inlist(ix)    = inlist(jx)
@@ -124,7 +125,7 @@ contains
 	end subroutine quicksort
 	
 	subroutine reorder_list(n, list, indices)
-		integer, intent(in)						:: n
+		integer(bigint), intent(in)				:: n
 		real(dbl), dimension(n), intent(inout)	:: list 
 		integer, dimension(n), intent(in)		:: indices
 	
@@ -144,6 +145,7 @@ contains
 		real(dbl), intent(in)					:: max_mem
 		
 		real(dbl) :: mem_estimate
+		integer(smallint)	:: sizer = 0
 		
 		mm%nlevels = n
 		mm%screening_type = 'fc' ! default to Franck-Condon screening
@@ -158,7 +160,7 @@ contains
 		end if
 		
 		! size in bites of a single occupation
-		mem_estimate = sizeof(n) *  n 
+		mem_estimate = sizeof(sizer) *  n 
 		! maximum size if all occs enumerated, convert to GB
 		mem_estimate = (mem_estimate * real(max_noccs)) / (1024d0**3)
 		mm%nrecords = ceiling(mem_estimate / mm%max_memory)	
@@ -188,10 +190,10 @@ contains
 		
 		interface 
 			function func(n, levels, hrfactors, occs)
-				import :: dbl
+				import :: dbl, smallint
 				integer, intent(in)					:: n
 				real(dbl), dimension(n), intent(in) :: levels, hrfactors
-				integer, dimension(n), intent(in) 	:: occs
+				integer(smallint), dimension(n), intent(in) 	:: occs
 				real(dbl)							:: func
 			end function
 		end interface
@@ -257,7 +259,7 @@ contains
 	
 	subroutine mm_write_to_bin(mm, occs, indices)
 		class(memorymanager), intent(inout)		:: mm
-		integer, dimension(:, :), intent(in) 	:: occs
+		integer(smallint), dimension(:, :), intent(in) 	:: occs
 		integer, dimension(:), intent(in)		:: indices
 		
 		character(len=100) :: filename
@@ -316,9 +318,9 @@ contains
 	end subroutine mm_read_from_bin
 	
 	integer(bigint) function ncombinations(n, max_occs, min_occs) result(max_nocc)
-		integer, intent(in)					:: n
-		integer, dimension(n), intent(in)	:: max_occs, min_occs
-		integer								:: ix
+		integer, intent(in)							:: n
+		integer(smallint), dimension(n), intent(in)	:: max_occs, min_occs
+		integer										:: ix
 		
 		max_nocc = 1
 		do ix=1,n
@@ -327,25 +329,25 @@ contains
 	end function ncombinations
 	
 	function energy(n, levels, hrfactors, occs) 
-		integer, intent(in)					:: n
-		real(dbl), dimension(n), intent(in) :: levels, hrfactors
-		integer, dimension(n), intent(in) 	:: occs
-		real(dbl)							:: energy
+		integer, intent(in)								:: n
+		real(dbl), dimension(n), intent(in) 			:: levels, hrfactors
+		integer(smallint), dimension(n), intent(in) 	:: occs
+		real(dbl)										:: energy
 		
 		energy = dot_product(occs, levels)
 	end function energy
 	
 	function franck_condon(n, levels, hrfactors, occs)
-		integer, intent(in)					:: n
-		real(dbl), dimension(n), intent(in) :: levels, hrfactors
-		integer, dimension(n), intent(in) 	:: occs
-		real(dbl)							:: franck_condon
+		integer, intent(in)								:: n
+		real(dbl), dimension(n), intent(in) 			:: levels, hrfactors
+		integer(smallint), dimension(n), intent(in) 	:: occs
+		real(dbl)										:: franck_condon
 		
 		integer 	:: ix
 		real(dbl) 	:: tmp
 		franck_condon = 1d0
 		do ix=1,n
-			tmp = exp(hrfactors(ix)) * (hrfactors(ix) ** occs(ix)) / factorial(occs(ix))
+			tmp = exp(hrfactors(ix)) * (hrfactors(ix) ** occs(ix)) / factorial(int(occs(ix)))
 			franck_condon =  franck_condon * tmp
 		end do
 		franck_condon = sqrt(franck_condon)
