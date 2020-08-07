@@ -1,4 +1,5 @@
 calculation,	nonradiative
+tofile,		true
 algorithm,	hybrid
 weighting,	fc
 energy,		0.1011460

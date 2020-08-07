@@ -116,7 +116,7 @@ program main
 				sys%mm%current_block = 0
 			end if
 			
-			write (*, '(1x,a,1x,i10,1x,a)') 'Found approximately', (sys%mm%current_record-1)*sys%mm%chunk_size, 'occs'
+			write (*, '(1x,a,1x,i10,1x,a)') 'Found approximately', (sys%mm%current_record-2)*sys%mm%chunk_size+noccs-1, 'occs'
 			write (*, *)
 			write (*, *) 'Calculating non-radiative rate'
 			sys%k_ic = 4d0 * sys%k_ic / sys%gamma 

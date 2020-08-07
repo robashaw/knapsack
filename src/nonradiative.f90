@@ -38,7 +38,7 @@ contains
 		character(len=*), intent(in)	:: filename
 		
 	    ! Input related variables
-	    character(len=100) :: buffer, label
+	    character(len=100) :: buffer, label, randostring
 	    integer 	:: pos
 	    integer 	:: ios = 0
 	    integer 	:: line = 0
@@ -94,7 +94,10 @@ contains
 	          case ('ncut')
 	             read(buffer, *, iostat=ios) sys%ncut
 			  case ('tofile')
-			  	 read(buffer, *, iostat=ios) sys%do_write
+			  	 read(buffer, *, iostat=ios) randostring
+				 if (trim(adjustl(randostring)) .eq. 'true') then
+					 sys%do_write = .true.
+				 end if
    	          case ('natoms')
    	             read(buffer, *, iostat=ios) sys%natoms
 	          case ('nthresh')
