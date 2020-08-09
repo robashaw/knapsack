@@ -158,7 +158,7 @@ contains
 					end if
 				end if
 				checked = checked + 1
-				!if (mod(checked, print_frequency) .eq. 1) call progress_bar_time(checked, maxnocc)
+				if (mod(checked, print_frequency) .eq. 0) write(*, *) 'Checked ', checked
 			end if
 		end do		
 	end subroutine iterate
@@ -204,7 +204,7 @@ contains
 		allocate(enlist(occsize))
 		noccs = 1
 		checked = 0
-		write(*, '(1x,a,1x,e12.4,1x,a,e12.4)') 'Estimated', real(max_nocc), 'occupations to check of a possible', real(worst_case)
+		write(*, '(1x,a,1x,e12.4)') 'Worst case no. of occs to check:', real(worst_case)
 		call screened_iterate(sys, occsize, emax, emin, cocc, 1, enlist, noccs, checked, max_nocc, sys%maxnfix, fixedn=.false.)
 		!call progress_bar_time(max_nocc, max_nocc)
 		write(*, *)
@@ -226,11 +226,12 @@ contains
 		allocate(enlist(occsize))
 		noccs = 1
 		checked = 0
-		write(*, '(1x,a,1x,e12.4,1x,a,e12.4)') 'Estimated', real(max_nocc), 'occupations to check of a possible', real(worst_case)
+		write(*, '(1x,a,1x,i5,a,1x,i5)') 'Nmin =', sys%minnfix, ', Nmax =', sys%maxnfix
+		write(*, '(1x,a,1x,e12.4)') 'Worst case no. of occs to check:', real(worst_case)
 		do nx=sys%minnfix, sys%maxnfix
 			cocc = 0
 			cocc(1) = sys%cutoffs(1, sys%nthresh+1)
-			write(*, '(1x,a,1x,i3)') 'Doing N =', nx 
+			write(*, '(1x,a,1x,i3,1x,a,1x,e12.4,1x,a)') 'Doing N =', nx, 'found', real(noccs-1), 'valid occs so far'
 			call screened_iterate(sys, occsize, emax, emin, cocc, 1, enlist, noccs, checked, max_nocc, nfix=nx, fixedn=.true.)
 		end do
 		!call progress_bar_time(max_nocc, max_nocc)
@@ -280,7 +281,7 @@ contains
 					end if
 				end if
 				checked = checked + 1
-				!if (mod(checked, print_frequency) .eq. 1) call progress_bar_time(checked, maxnocc)
+				if (mod(checked, print_frequency) .eq. 0) write(*, *) 'Checked ', checked
 			end do
 		else
 			do i=0,maxix

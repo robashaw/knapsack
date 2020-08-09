@@ -1,6 +1,8 @@
 calculation,	nonradiative
 tofile,		false
 algorithm,	fixedn
+nmin,		11
+nmax,		19
 weighting,	fc
 energy,		0.1011460
 deltae,		0.04

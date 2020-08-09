@@ -243,7 +243,6 @@ contains
 			end select
 			
 			! we now only need to write the current block to file up to max_ix
-			write(*, *) max_ix_in, max_ix_out, size(indices)
 			call mm%write_to_bin(mm%current_block, indices(:max_ix_out))
 			! reset the block and increment counter
 			mm%current_record = mm%current_record + 1

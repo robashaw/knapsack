@@ -1,11 +1,14 @@
 calculation,	nonradiative
 memory,		2
-algorithm,	hybrid
+algorithm,	fixedn
+nmax,		9
+nmin,		9
+tofile,		true
 energy,		0.105675
 deltae,		0.040
 natoms,		18
-bfile,		'Bvectors.dat'
-gradfile,	'NAME.dat'
+bfile,		Bvectors.dat
+gradfile,	NAME.dat
 ncut,		10
 nthresh,	18
 nsamples,	5000000
@@ -47,4 +50,3 @@ levels,		37
 0.398879176740438,	0.0000125
 0.402771061930444,	0.0000245
 0.406345545843407,	0.000392
-

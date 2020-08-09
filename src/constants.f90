@@ -13,7 +13,7 @@ module constants
 	integer, parameter		:: occs_unit = 19
 	integer, parameter		:: n_guesses = 10
 	integer, parameter		:: n_cut_guess = 4	
-	integer, parameter		:: print_frequency = 100000
+	integer, parameter		:: print_frequency = 100000000
 	real(dbl), parameter	:: tolint = 1D-12
 	real(dbl), parameter 	:: damping = 1.0
 	real(dbl), parameter	:: PLANCK = 4.135667696D-15 ! in eV.s

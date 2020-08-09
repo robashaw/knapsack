@@ -56,6 +56,8 @@ contains
 		sys%do_write = .false.
 		sys%memory = 0.5d0
 		sys%nrecords = 0
+		sys%maxnfix = -1
+		sys%minnfix = -1
 	    do while (ios == 0)
 	       read(main_input_unit, '(A)', iostat=ios) buffer
 	       if (ios == 0) then
@@ -109,6 +111,10 @@ contains
 			  case ('nsamples')
 			  	 read(buffer, *, iostat=ios) tmp_nsamples
 				 sys%nsamples = int(tmp_nsamples)
+			  case ('nmax')
+			  	 read(buffer, *, iostat=ios) sys%maxnfix
+   			  case ('nmin')
+   			  	 read(buffer, *, iostat=ios) sys%minnfix
       		  case ('memory')
       			 read(buffer, *, iostat=ios) sys%memory
    			  case ('energy')
@@ -172,16 +178,19 @@ contains
 			sys%maxoccs = [(sys%cutoffs(ix, sys%nthresh+1), ix=1,sys%nlevels)]
 			sys%maxnoccs = ncombinations(sys%nlevels, sys%maxoccs, sys%minoccs)
 			
-			sys%maxnfix = sum(sys%maxoccs)
-			sys%minnfix = ceiling((sys%e_target*TO_EV - sys%delta_e)/(maxval(sys%energies)))
+			if (sys%maxnfix .lt. 0) then
+				sys%maxnfix = sum(sys%maxoccs)
+				if (sys%algorithm .eq. 'fixedn') then
+					! Estimate maxn 
+					nestimate = 10**(2*sys%nthresh/sys%nlevels)
+					nestimate = nestimate * exp(-sum(sys%hrfactors))
+					nestimate = nestimate ** (1.0/sys%nlevels)
+					sys%maxnfix = ceiling(sys%nlevels * nestimate)
+				end if
+			end if
 			
-			if (sys%algorithm .eq. 'fixedn') then
-				! Estimate maxn 
-				nestimate = 10**(2*sys%nthresh/sys%nlevels)
-				nestimate = nestimate * exp(-sum(sys%hrfactors))
-				nestimate = nestimate ** (1.0/sys%nlevels)
-				sys%maxnfix = ceiling(sys%nlevels * nestimate)
-				write(*, '(1x,a,1x,i5,a,1x,i5)') 'Nmin =', sys%minnfix, ', Nmax =', sys%maxnfix
+			if (sys%minnfix .lt. 0) then
+				sys%minnfix = ceiling((sys%e_target*TO_EV - sys%delta_e)/(maxval(sys%energies)))
 			end if
 			
 			call sys%mm%initialise(sys%nlevels, sys%maxnoccs, sys%memory, sys%nthresh)
