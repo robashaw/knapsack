@@ -1,6 +1,7 @@
 calculation,	nonradiative
 debug,		2
-algorithm,	fixedn
+algorithm,	fromfile
+nrecords,	1
 energy,		0.1368950
 deltae,		0.04
 natoms,		18

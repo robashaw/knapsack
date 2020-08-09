@@ -138,9 +138,9 @@ contains
 		end do
 	end subroutine reorder_list
 	
-	subroutine mm_init(mm, n, max_noccs, max_mem)
+	subroutine mm_init(mm, n, max_noccs, max_mem, nthresh)
 		class(memorymanager), intent(inout)		:: mm
-		integer, intent(in) 					:: n
+		integer, intent(in) 					:: n, nthresh
 		integer(bigint), intent(in)				:: max_noccs
 		real(dbl), intent(in)					:: max_mem
 		
@@ -149,7 +149,7 @@ contains
 		
 		mm%nlevels = n
 		mm%screening_type = 'fc' ! default to Franck-Condon screening
-		mm%threshold = 1D-12 ! threshold for screening 
+		mm%threshold = 10.0**(-nthresh) ! threshold for screening 
 		mm%keep_top = .false.
 		
 		! maximum memory availale in GB
@@ -181,11 +181,12 @@ contains
 		filename = 'occs.' // trim(adjustl(filename))
 	end subroutine mm_record_name
 	
-	subroutine mm_sort_and_screen(mm, levels, hrfactors, thresh, max_ix, indices, func)
+	subroutine mm_sort_and_screen(mm, levels, hrfactors, thresh, max_ix_in, max_ix_out, indices, func)
 		class(memorymanager), intent(inout)				:: mm
 		real(dbl), intent(in)							:: thresh
-		integer, intent(out)							:: max_ix
-		integer, dimension(mm%chunk_size), intent(out)	:: indices
+		integer, intent(in)								:: max_ix_in
+		integer, intent(out)							:: max_ix_out
+		integer, dimension(max_ix_in), intent(out)		:: indices
 		real(dbl), dimension(mm%nlevels), intent(in)	:: levels, hrfactors
 		
 		interface 
@@ -199,34 +200,35 @@ contains
 		end interface
 		
 		! Calculate values using func
-		real(dbl), dimension(mm%chunk_size) :: values
+		real(dbl), dimension(max_ix_in) :: values
 		integer :: ix
-		do ix=1,mm%chunk_size
+		do ix=1,max_ix_in
 			values(ix) = -func(mm%nlevels, levels, hrfactors, mm%current_block(:, ix))
 		end do
 		
 		! sort in descending order
-		indices(1:mm%chunk_size) = (/ (ix, ix=1,mm%chunk_size) /)
-		call quicksort(mm%chunk_size, values, indices)
+		indices(1:max_ix_in) = (/ (ix, ix=1,max_ix_in) /)
+		call quicksort(max_ix_in, values, indices)
 		
 		! find the cutoff index
-		max_ix = 1
+		max_ix_out = 1
 		main: do
-			if (-values(max_ix) .gt. thresh) then
-				max_ix = max_ix + 1
+			if (-values(max_ix_out) .gt. thresh) then
+				max_ix_out = max_ix_out + 1
 			else 
 				exit main
 			end if
 		end do main
 	end subroutine mm_sort_and_screen
 	
-	subroutine mm_block_swap(mm, levels, hrfactors)
+	subroutine mm_block_swap(mm, levels, hrfactors, max_ix_in)
 		class(memorymanager), intent(inout)				:: mm
 		real(dbl), dimension(mm%nlevels), intent(in)	:: levels, hrfactors
+		integer, intent(in)								:: max_ix_in
 		
-		integer	:: max_ix, ix
-		integer, dimension(mm%chunk_size) :: indices
-		integer, dimension(mm%nlevels)	  :: tmp_occ
+		integer	:: max_ix_out, ix
+		integer, dimension(max_ix_in) 	:: indices
+		integer, dimension(mm%nlevels)	:: tmp_occ
 		
 		! check if there is currently a block
 		if (allocated(mm%current_block)) then
@@ -235,18 +237,19 @@ contains
 			write(*, '(A15,I5,A16,1X,A10)') 'Sorting record', mm%current_record, 'screening by', mm%screening_type
 			select case(mm%screening_type)
 			case ('energy')
-				call mm%sort_and_screen(levels, hrfactors, mm%threshold, max_ix, indices, energy)
+				call mm%sort_and_screen(levels, hrfactors, mm%threshold, max_ix_in, max_ix_out, indices, energy)
 			case default
-				call mm%sort_and_screen(levels, hrfactors, mm%threshold, max_ix, indices, franck_condon)
+				call mm%sort_and_screen(levels, hrfactors, mm%threshold, max_ix_in, max_ix_out, indices, franck_condon)
 			end select
 			
 			! we now only need to write the current block to file up to max_ix
-			call mm%write_to_bin(mm%current_block, indices(:max_ix))
+			write(*, *) max_ix_in, max_ix_out, size(indices)
+			call mm%write_to_bin(mm%current_block, indices(:max_ix_out))
 			! reset the block and increment counter
 			mm%current_record = mm%current_record + 1
-			if (mm%keep_top .and. (max_ix .lt. mm%chunk_size)) then
+			if (mm%keep_top .and. (max_ix_out .lt. mm%chunk_size)) then
 				! stochastic case need to keep the 'top' records
-				mm%current_block(:, max_ix+1:) = 0
+				mm%current_block(:, max_ix_out+1:) = 0
 			else 
 				mm%current_block = 0
 			end if 
@@ -283,11 +286,12 @@ contains
 	end subroutine mm_write_to_bin
 	
 	subroutine mm_read_from_bin(mm, n, record, occs)
-		class(memorymanager), intent(inout)					:: mm
-		integer, intent(in)									:: n, record
-		integer, dimension(:, :), allocatable, intent(out) 	:: occs
+		class(memorymanager), intent(inout)								:: mm
+		integer, intent(in)												:: n, record
+		integer(smallint), dimension(:, :), allocatable, intent(out) 	:: occs
 		
-		integer	:: ios, nrows, i, filesize, firstrow(n)
+		integer	:: ios, nrows, i, filesize
+		integer(smallint) :: firstrow(n)
 		character(len=100) :: filename
 		
 		
@@ -297,7 +301,12 @@ contains
 			inquire(occs_unit, size=filesize)
 			read(occs_unit) firstrow
 			nrows = filesize / sizeof(firstrow)
+			if (allocated(occs)) then
+				deallocate(occs)
+			end if
 			allocate(occs(n, nrows))
+			mm%chunk_size = nrows
+			write(*, *) 'Expecting ', nrows, ' rows'
 			
 			occs(:, 1) = firstrow(:)
 			do i=2,nrows

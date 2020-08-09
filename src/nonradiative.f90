@@ -6,7 +6,7 @@ module nonradiative
 	type sysdata
 		logical											:: do_rad, do_nonrad, do_write
 		integer											:: ncut, nthresh, nlevels, nsamples, natoms, debug_level
-		integer											:: maxnfix, minnfix
+		integer											:: maxnfix, minnfix, nrecords
 		integer(bigint)									:: maxnoccs
 		character(len=100)								:: bfile, gradfile, algorithm, weighting
 		character(len=100)								:: radfile, calctype, radunits, sortby
@@ -55,6 +55,7 @@ contains
 		sys%debug_level = 0
 		sys%do_write = .false.
 		sys%memory = 0.5d0
+		sys%nrecords = 0
 	    do while (ios == 0)
 	       read(main_input_unit, '(A)', iostat=ios) buffer
 	       if (ios == 0) then
@@ -92,6 +93,8 @@ contains
       		     sys%sortby = trim(adjustl(sys%sortby))
    	          case ('debug')
    	             read(buffer, *, iostat=ios) sys%debug_level
+			  case ('nrecords')
+			  	 read(buffer, *, iostat=ios) sys%nrecords
 	          case ('ncut')
 	             read(buffer, *, iostat=ios) sys%ncut
 			  case ('tofile')
@@ -181,8 +184,8 @@ contains
 				write(*, '(1x,a,1x,i5,a,1x,i5)') 'Nmin =', sys%minnfix, ', Nmax =', sys%maxnfix
 			end if
 			
-			call sys%mm%initialise(sys%nlevels, sys%maxnoccs, sys%memory)
-			call sys%mm%block_swap(sys%energies, sys%hrfactors)
+			call sys%mm%initialise(sys%nlevels, sys%maxnoccs, sys%memory, sys%nthresh)
+			call sys%mm%block_swap(sys%energies, sys%hrfactors, sys%mm%chunk_size)
 		end if
 	end subroutine sysdata_init
 	

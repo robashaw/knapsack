@@ -15,7 +15,7 @@ program main
 	n = 8
 	allocate(testlist(n), outlist(n), ixlist(n))
 	
-	call mm%initialise(n, maxnoccs, 1.0d0)
+	call mm%initialise(n, maxnoccs, 1.0d0, 12)
 	do i=1, n
 		testlist(i) = rand()
 	end do

@@ -149,7 +149,7 @@ contains
 						write(*, '(1x,a,1x,i10)') 'Finished block', sys%mm%current_record
 						call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=sys%mm%chunk_size)
 						if (sys%do_write) then
-							call sys%mm%block_swap(sys%energies, sys%hrfactors)
+							call sys%mm%block_swap(sys%energies, sys%hrfactors, sys%mm%chunk_size)
 						else
 							sys%mm%current_record = sys%mm%current_record + 1
 							sys%mm%current_block = 0
@@ -271,7 +271,7 @@ contains
 						write(*, '(1x,a,1x,i10)') 'Finished block', sys%mm%current_record
 						call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=sys%mm%chunk_size)
 						if (sys%do_write) then
-							call sys%mm%block_swap(sys%energies, sys%hrfactors)
+							call sys%mm%block_swap(sys%energies, sys%hrfactors, sys%mm%chunk_size)
 						else
 							sys%mm%current_record = sys%mm%current_record + 1
 							sys%mm%current_block = 0

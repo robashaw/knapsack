@@ -106,20 +106,33 @@ program main
 			case ('fixedn')
 				worst_case = sys%maxnoccs
 				call screened_fixed_n(sys, emax, emin, enlist, noccs, worst_case)
+			case ('fromfile')
+				write(*, '(1x,a)') 'Reading occs from occs.*'
+				sys%mm%nrecords = sys%nrecords
+				write(*, '(1x,a,1x,i4,1x,a)') 'Looking for', sys%mm%nrecords, 'records'
+				do ix=1,sys%mm%nrecords
+					call sys%mm%read_from_bin(sys%nlevels, ix, sys%mm%current_block)
+					call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=sys%mm%chunk_size)
+					noccs = noccs + sys%mm%chunk_size
+				end do
 			case default
 				worst_case = sys%maxnoccs 
 				call screened_brute_force(sys, emax, emin, enlist, noccs, worst_case)
 			end select
-			write(*, '(1x,a,1x,i10)') 'Finished block', sys%mm%current_record
-			call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=noccs-1)
-			if (sys%do_write) then
-				call sys%mm%block_swap(sys%energies, sys%hrfactors)
-			else
-				sys%mm%current_record = sys%mm%current_record + 1
-				sys%mm%current_block = 0
+			if (sys%algorithm .ne. 'fromfile') then
+				write(*, '(1x,a,1x,i10)') 'Finished block', sys%mm%current_record
+				call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=noccs-1)
+				if (sys%do_write) then
+					call sys%mm%block_swap(sys%energies, sys%hrfactors, noccs-1)
+				else
+					sys%mm%current_record = sys%mm%current_record + 1
+					sys%mm%current_block = 0
+				end if
+				
+				noccs = (sys%mm%current_record-2)*sys%mm%chunk_size+noccs-1
 			end if
 			
-			write (*, '(1x,a,1x,i10,1x,a)') 'Found approximately', (sys%mm%current_record-2)*sys%mm%chunk_size+noccs-1, 'occs'
+			write (*, '(1x,a,1x,i10,1x,a)') 'Found approximately', noccs, 'occs'
 			write (*, *)
 			write (*, *) 'Calculating non-radiative rate'
 			sys%k_ic = 4d0 * sys%k_ic / sys%gamma 
