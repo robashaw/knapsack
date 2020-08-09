@@ -1,5 +1,6 @@
 calculation,	nonradiative
-algorithm,	hybrid
+debug,		2
+algorithm,	fixedn
 energy,		0.1368950
 deltae,		0.04
 natoms,		18

@@ -61,7 +61,7 @@ program main
 			write (*, *) 'NON-RADIATIVE RATE CALCULATION'
 			write (*, '(1x,a,i2,a,a)') 'Read in ', sys%nlevels, ' energy levels from file ', arg
 			write (*, *)
-			if ((sys%algorithm .ne. 'brute') .and. (sys%algorithm .ne. 'stochastic')) sys%algorithm = 'hybrid'
+			!if ((sys%algorithm .ne. 'brute') .and. (sys%algorithm .ne. 'stochastic')) sys%algorithm = 'hybrid'
 			noccs = 1
 			
 			if (sys%debug_level .gt. 0) then
@@ -103,6 +103,9 @@ program main
 					call do_sample(sys, guesses, sys%maxoccs, guess_ens, emin, emax, uniform_indices, tbl, occlist, enlist, bignoccs)
 				end select
 				bignoccs = bignoccs + 1
+			case ('fixedn')
+				worst_case = sys%maxnoccs
+				call screened_fixed_n(sys, emax, emin, enlist, noccs, worst_case)
 			case default
 				worst_case = sys%maxnoccs 
 				call screened_brute_force(sys, emax, emin, enlist, noccs, worst_case)

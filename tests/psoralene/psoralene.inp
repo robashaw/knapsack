@@ -1,6 +1,6 @@
 calculation,	nonradiative
 memory,		2
-algorithm,	hybrid
+algorithm,	fixedn
 weighting,	fc
 energy,		0.107768
 debug,		0
@@ -9,7 +9,7 @@ natoms,		20
 bfile,		Bvectors.dat
 gradfile,	NAME.dat
 ncut,		5
-nthresh,	18
+nthresh,	12
 nsamples,	50000000
 levels,		52
 0.010486567,	0.147

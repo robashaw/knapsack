@@ -6,6 +6,7 @@ module nonradiative
 	type sysdata
 		logical											:: do_rad, do_nonrad, do_write
 		integer											:: ncut, nthresh, nlevels, nsamples, natoms, debug_level
+		integer											:: maxnfix, minnfix
 		integer(bigint)									:: maxnoccs
 		character(len=100)								:: bfile, gradfile, algorithm, weighting
 		character(len=100)								:: radfile, calctype, radunits, sortby
@@ -137,6 +138,7 @@ contains
 		class(sysdata), intent(inout)	:: sys
 		
 		integer	:: ix
+		real(dbl)	:: nestimate
 		real(dbl), dimension(sys%nlevels) :: unsorted_levels
 		
 		allocate(sys%energy_order(sys%nlevels))
@@ -166,6 +168,18 @@ contains
 			sys%minoccs = 0
 			sys%maxoccs = [(sys%cutoffs(ix, sys%nthresh+1), ix=1,sys%nlevels)]
 			sys%maxnoccs = ncombinations(sys%nlevels, sys%maxoccs, sys%minoccs)
+			
+			sys%maxnfix = sum(sys%maxoccs)
+			sys%minnfix = ceiling((sys%e_target*TO_EV - sys%delta_e)/(maxval(sys%energies)))
+			
+			if (sys%algorithm .eq. 'fixedn') then
+				! Estimate maxn 
+				nestimate = 10**(2*sys%nthresh/sys%nlevels)
+				nestimate = nestimate * exp(-sum(sys%hrfactors))
+				nestimate = nestimate ** (1.0/sys%nlevels)
+				sys%maxnfix = ceiling(sys%nlevels * nestimate)
+				write(*, '(1x,a,1x,i5,a,1x,i5)') 'Nmin =', sys%minnfix, ', Nmax =', sys%maxnfix
+			end if
 			
 			call sys%mm%initialise(sys%nlevels, sys%maxnoccs, sys%memory)
 			call sys%mm%block_swap(sys%energies, sys%hrfactors)

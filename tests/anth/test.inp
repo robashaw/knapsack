@@ -1,6 +1,6 @@
 calculation,	nonradiative
-tofile,		true
-algorithm,	hybrid
+tofile,		false
+algorithm,	fixedn
 weighting,	fc
 energy,		0.1011460
 deltae,		0.04

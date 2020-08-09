@@ -205,25 +205,62 @@ contains
 		noccs = 1
 		checked = 0
 		write(*, '(1x,a,1x,e12.4,1x,a,e12.4)') 'Estimated', real(max_nocc), 'occupations to check of a possible', real(worst_case)
-		call screened_iterate(sys, occsize, emax, emin, cocc, 1, enlist, noccs, checked, max_nocc)
+		call screened_iterate(sys, occsize, emax, emin, cocc, 1, enlist, noccs, checked, max_nocc, sys%maxnfix, fixedn=.false.)
 		!call progress_bar_time(max_nocc, max_nocc)
 		write(*, *)
 	end subroutine screened_brute_force
 	
-	recursive subroutine screened_iterate(sys, noccs, emax, emin, occ, ix, enlist, occix, checked, maxnocc)
-		type(sysdata), intent(inout)							:: sys
-		integer, intent(in)										:: ix
-		integer(bigint), intent(in)								:: noccs, maxnocc
-		integer(bigint), intent(inout)							:: occix, checked
-		integer(smallint), dimension(sys%nlevels), intent(inout)			:: occ
-		real(dbl), dimension(noccs), intent(inout)				:: enlist
-		real(dbl), intent(in)									:: emax, emin
+	subroutine screened_fixed_n(sys, emax, emin, enlist, noccs, worst_case)
+		type(sysdata), intent(inout)						:: sys
+		real(dbl), intent(in)								:: emax, emin
+		real(dbl), allocatable, dimension(:), intent(out)	:: enlist
+		integer(bigint), intent(in)							:: worst_case
+		integer(bigint), intent(out)						:: noccs
 		
-		integer		:: i, maxix, bnd
+		integer(bigint)	:: max_nocc, occsize, checked
+		integer(smallint)	:: cocc(sys%nlevels)
+		integer :: ix, nx
+		max_nocc = sys%maxnoccs
+		occsize = sys%mm%chunk_size
+		
+		allocate(enlist(occsize))
+		noccs = 1
+		checked = 0
+		write(*, '(1x,a,1x,e12.4,1x,a,e12.4)') 'Estimated', real(max_nocc), 'occupations to check of a possible', real(worst_case)
+		do nx=sys%minnfix, sys%maxnfix
+			cocc = 0
+			cocc(1) = sys%cutoffs(1, sys%nthresh+1)
+			write(*, '(1x,a,1x,i3)') 'Doing N =', nx 
+			call screened_iterate(sys, occsize, emax, emin, cocc, 1, enlist, noccs, checked, max_nocc, nfix=nx, fixedn=.true.)
+		end do
+		!call progress_bar_time(max_nocc, max_nocc)
+		write(*, *)
+	end subroutine
+	
+	recursive subroutine screened_iterate(sys, noccs, emax, emin, occ, ix, enlist, occix, checked, maxnocc, nfix, fixedn)
+		type(sysdata), intent(inout)								:: sys
+		integer, intent(in)											:: ix, nfix
+		integer(bigint), intent(in)									:: noccs, maxnocc
+		integer(bigint), intent(inout)								:: occix, checked
+		integer(smallint), dimension(sys%nlevels), intent(inout)	:: occ
+		real(dbl), dimension(noccs), intent(inout)					:: enlist
+		real(dbl), intent(in)										:: emax, emin
+		logical, intent(in)											:: fixedn
+		
+		integer		:: i, maxix, minix, bnd, newnfix
 		real(dbl) 	:: en
-		maxix = occ(ix)
+		maxix = min(occ(ix), nfix)
 		if (ix .eq. sys%nlevels) then
-			do i=0,maxix
+			if (fixedn) then
+				minix = max(nfix, 0)
+				if (maxix .lt. minix) then
+					continue
+				end if
+				maxix = minix
+			else
+				minix = 0
+			end if
+			do i=minix,maxix
 				occ(ix) = i
 				en = dot_product(sys%energies, occ)
 				if ((en .lt. emax) .and. (en .gt. emin)) then
@@ -248,9 +285,10 @@ contains
 		else
 			do i=0,maxix
 				occ(ix) = i
+				newnfix = nfix - i
 				call sys%get_next_bound(occ, ix, bnd)
 				occ(ix+1) = sys%cutoffs(ix+1, bnd)
-				call screened_iterate(sys, noccs, emax, emin, occ, ix+1, enlist, occix, checked, maxnocc)
+				call screened_iterate(sys, noccs, emax, emin, occ, ix+1, enlist, occix, checked, maxnocc, newnfix, fixedn)
 			end do
 		end if
 	end subroutine screened_iterate
