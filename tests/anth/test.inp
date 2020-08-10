@@ -1,8 +1,12 @@
 calculation,	nonradiative
+memory,		0.01
 tofile,		false
-algorithm,	fixedn
-nmin,		11
-nmax,		19
+algorithm,	fromfile
+nrecords,	1
+nmin,		7
+nmax,		7
+debug,		0
+dump,		2
 weighting,	fc
 energy,		0.1011460
 deltae,		0.04

@@ -4,6 +4,7 @@ program main
 	use radiative
 	use sample
 	use knapsack 
+	use ioutil
 	
 	character(len=100)						:: arg
 	integer									:: ios
@@ -111,7 +112,7 @@ program main
 				sys%mm%nrecords = sys%nrecords
 				write(*, '(1x,a,1x,i4,1x,a)') 'Looking for', sys%mm%nrecords, 'records'
 				do ix=1,sys%mm%nrecords
-					call sys%mm%read_from_bin(sys%nlevels, ix, sys%mm%current_block)
+					call sys%mm%read_from_bin(sys%nlevels, ix, sys%mm%current_block, sys%energies, sys%hrfactors)
 					call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=sys%mm%chunk_size)
 					noccs = noccs + sys%mm%chunk_size
 				end do

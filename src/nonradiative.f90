@@ -97,6 +97,8 @@ contains
    	             read(buffer, *, iostat=ios) sys%debug_level
 			  case ('nrecords')
 			  	 read(buffer, *, iostat=ios) sys%nrecords
+			  case ('dump')
+			  	 read(buffer, *, iostat=ios) sys%mm%dumplevel
 	          case ('ncut')
 	             read(buffer, *, iostat=ios) sys%ncut
 			  case ('tofile')

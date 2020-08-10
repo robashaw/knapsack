@@ -11,6 +11,8 @@ module constants
 	integer, parameter		:: gradfile_unit = 17
 	integer, parameter		:: radiative_unit = 18
 	integer, parameter		:: occs_unit = 19
+	integer, parameter		:: occs_unit_2 = 20
+	integer, parameter		:: output_unit = 21
 	integer, parameter		:: n_guesses = 10
 	integer, parameter		:: n_cut_guess = 4	
 	integer, parameter		:: print_frequency = 100000000

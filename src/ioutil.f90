@@ -5,7 +5,7 @@ module ioutil
 	
 	type memorymanager
 		real(dbl) 							  :: max_memory, threshold
-		integer								  :: nrecords, current_record, nlevels
+		integer								  :: nrecords, current_record, nlevels, dumplevel=0
 		integer(bigint)					      :: chunk_size
 		integer(smallint), dimension(:, :), allocatable :: current_block
 		character(len=10)					  :: screening_type	
@@ -17,6 +17,7 @@ module ioutil
 		procedure	:: sort_and_screen => mm_sort_and_screen
 		procedure	:: write_to_bin => mm_write_to_bin
 		procedure	:: read_from_bin => mm_read_from_bin
+		procedure	:: merge_files => mm_merge_files
 	end type memorymanager
 	
 contains
@@ -268,14 +269,14 @@ contains
 		integer	:: ios
 		
 		call mm%record_name(filename, mm%current_record)
-		open(unit=occs_unit, file=filename, form='unformatted', access='stream')
+		open(unit=output_unit, file=filename, form='unformatted', access='stream')
 		
 		if (size(indices) .eq. 0) then
-			write(occs_unit, iostat=ios) occs
+			write(output_unit, iostat=ios) occs
 		else
-			write(occs_unit, iostat=ios) occs(:, indices(:))
+			write(output_unit, iostat=ios) occs(:, indices(:))
 		end if
-		close(occs_unit)
+		close(output_unit)
 		
 		if (ios .ne. 0) then
 			write(*, *) 'Error writing record ', trim(filename), ' with ios=', ios
@@ -284,13 +285,15 @@ contains
 		end if
 	end subroutine mm_write_to_bin
 	
-	subroutine mm_read_from_bin(mm, n, record, occs)
+	subroutine mm_read_from_bin(mm, n, record, occs, levels, hrfactors)
 		class(memorymanager), intent(inout)								:: mm
 		integer, intent(in)												:: n, record
 		integer(smallint), dimension(:, :), allocatable, intent(out) 	:: occs
+		real(dbl), dimension(mm%nlevels), intent(in)					:: levels, hrfactors
 		
 		integer	:: ios, nrows, i, filesize
 		integer(smallint) :: firstrow(n)
+		real(dbl) :: en, fc
 		character(len=100) :: filename
 		
 		
@@ -320,10 +323,164 @@ contains
 			close(occs_unit)
 			
 			write(*, *) 'Successfully read record ', trim(filename), ' with dimensions ', shape(occs)
+			
+			if (mm%dumplevel .eq. 1) then
+				write(*, *) 'OCCUPATIONS'
+				do i=1,nrows
+					write(*, *) occs(:, i)
+				end do
+			else if (mm%dumplevel .eq. 2) then
+				write(*, '(1x, a12, 1x, a12)') 'ENERGY (EV)', 'FC FACTOR'
+				do i=1,nrows
+					en = energy(mm%nlevels, levels, hrfactors, occs(:, i))
+					fc = franck_condon(mm%nlevels, levels, hrfactors, occs(:, i))
+					write(*, '(1x,d12.4,2x,d12.4)') en, fc
+				end do
+			end if
 		else
 			write(*, *) 'Error reading record ', filename
 		end if
 	end subroutine mm_read_from_bin
+	
+	subroutine mm_merge_files(mm, file1, file2, outfile, levels, hrfactors, func)
+		class(memorymanager), intent(inout)	:: mm
+		character(len=*), intent(in)		:: file1, file2, outfile
+		real(dbl), dimension(mm%nlevels), intent(in)	:: levels, hrfactors
+		
+		interface 
+			function func(n, levels, hrfactors, occs)
+				import :: dbl, smallint
+				integer, intent(in)					:: n
+				real(dbl), dimension(n), intent(in) :: levels, hrfactors
+				integer(smallint), dimension(n), intent(in) 	:: occs
+				real(dbl)							:: func
+			end function
+		end interface
+		
+		integer 			:: maxrecords, ios, nrows1, nrows2, i, filesize, delta
+		integer				:: size1, size2, ptr1=1, ptr2=1, start1=2, start2=2, ctr1=0, ctr2=0
+		integer(smallint) 	:: firstrow(mm%nlevels), sizer=0
+		real(dbl)			:: val1, val2
+		integer(smallint), dimension(:, :), allocatable	:: f1occs, f2occs
+		
+		write(*, '(1x,a,1x,a,1x,a,1x,a)') 'Merging', file1, 'and', file2
+		
+		! calculate how many records can open from each file
+		maxrecords = floor(0.5 * mm%max_memory * (1024**3) / (sizeof(sizer) * mm%nlevels))
+		! open the two files
+		open(unit=occs_unit, file=file1, form='unformatted', access='stream', iostat=ios)
+		open(unit=occs_unit_2, file=file2, form='unformatted', access='stream', iostat=ios)
+		open(unit=output_unit, file=outfile, form='unformatted', access='stream')
+		if (ios .eq. 0) then
+			! file 1 nrecords
+			inquire(occs_unit, size=filesize)
+			read(occs_unit) firstrow
+			nrows1 = filesize / sizeof(firstrow)
+			size1 = min(nrows1, maxrecords)
+			allocate(f1occs(mm%nlevels, size1))
+			f1occs(:, 1) = firstrow(:)
+			write(*, '(1x,a,1x,i10,1x,a)') 'File1 has', nrows1, 'rows'
+			
+			! file 2 nrecords
+			inquire(occs_unit_2, size=filesize)
+			read(occs_unit_2) firstrow
+			nrows2 = filesize / sizeof(firstrow)
+			size2 = min(nrows2, maxrecords)
+			allocate(f2occs(mm%nlevels, size2))
+			f2occs(:, 1) = firstrow(:)
+			write(*, '(1x,a,1x,i10,1x,a)') 'File2 has', nrows2, 'rows'
+			ptr1 = size1
+			ptr2 = size2
+			main: do 
+				if (ptr1 .eq. size1) size1 = min(size1, nrows1-ctr1)
+				if (ptr2 .eq. size2) size2 = min(size2, nrows2-ctr2)
+				if (size1 .eq. 0) then
+					 if (size2 .eq. 0) exit main
+					 ! write the rest of file2 to output
+					 do while (ctr2 .lt. nrows2)
+					 	do i=ptr2,size2
+							 write(unit=output_unit, iostat=ios) f2occs(:, i)
+						end do
+						
+						size2 = min(size2, nrows2-ctr2)
+						start2 = 1
+						ptr2 = 1
+						
+						do i=start2,size2
+							read(occs_unit_2, iostat=ios) f2occs(:, i)
+						end do
+						ctr2 = ctr2 + size2
+					end do
+				 	do i=ptr2,size2
+						 write(unit=output_unit, iostat=ios) f2occs(:, i)
+					end do			
+					size2 = 0
+				else if (size2 .eq. 0) then
+				 	do while (ctr1 .lt. nrows1)
+				 	   	do i=ptr1,size1
+							 write(unit=output_unit, iostat=ios) f1occs(:, i)
+						end do
+					
+						size1 = min(size1, nrows1-ctr1)
+						start1 = 1
+						ptr1 = 1
+						
+						do i=start1,size1
+							read(occs_unit, iostat=ios) f1occs(:, i)
+						end do
+						ctr1 = ctr1 + size1
+					end do
+			 	   	do i=ptr1,size1
+						 write(unit=output_unit, iostat=ios) f1occs(:, i)
+					end do
+					size1 = 0
+				else
+					if (ptr1 .ge. size1) then
+						do i=start1,size1
+							read(occs_unit, iostat=ios) f1occs(:, i)
+						end do
+						ctr1 = ctr1 + size1
+						start1 = 1
+						ptr1 = 1
+					end if 
+						
+					if (ptr2 .ge. size2) then
+						do i=start2,size2
+							read(occs_unit_2, iostat=ios) f2occs(:, i)
+						end do
+						ctr2 = ctr2 + size2
+						start2 = 1
+						ptr2 = 1
+					end if 
+					
+					val1 = func(mm%nlevels, levels, hrfactors, f1occs(:, ptr1))
+					val2 = func(mm%nlevels, levels, hrfactors, f2occs(:, ptr2))
+					do while ((ptr1 .lt. size1) .and. (ptr2 .lt. size2))
+						delta = sum(abs(f1occs(:, ptr1) - f2occs(:, ptr2)))
+						if (delta .eq. 0) then
+							ptr2 = ptr2 + 1
+							val2 = func(mm%nlevels, levels, hrfactors, f2occs(:, ptr2))
+						else if (val1 .gt. val2) then
+							write(unit=output_unit, iostat=ios) f1occs(:, ptr1)
+							ptr1 = ptr1 + 1
+							val1 = func(mm%nlevels, levels, hrfactors, f1occs(:, ptr1))
+						else 
+							write(unit=output_unit, iostat=ios) f2occs(:, ptr2)
+							ptr2 = ptr2 + 1
+							val2 = func(mm%nlevels, levels, hrfactors, f2occs(:, ptr2))
+						end if
+					end do
+				end if
+			end do main
+			
+			close(occs_unit)
+			close(occs_unit_2)
+			close(output_unit)
+		else
+			write(*, *) 'Error reading records'
+		end if
+		
+	end subroutine mm_merge_files
 	
 	integer(bigint) function ncombinations(n, max_occs, min_occs) result(max_nocc)
 		integer, intent(in)							:: n
