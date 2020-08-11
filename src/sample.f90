@@ -22,27 +22,30 @@ contains
 		end do
 	end subroutine differences
 	
-	subroutine add_occ(n, values, emin, emax, nsamples, noccs, occlist, enlist, tbl)
-		integer, intent(in)								:: n, nsamples
-		real(dbl), dimension(n), intent(in)				:: values
-		integer(bigint), intent(inout)					:: noccs
-		real(dbl), intent(in)							:: emin, emax
-		integer(smallint), dimension(n, nsamples), intent(inout)	:: occlist
-		real(dbl), dimension(nsamples), intent(inout)	:: enlist
-		type(hash_tbl_sll), intent(inout)				:: tbl
+	subroutine add_occ(sys, emin, emax, noccs, occ, enlist)
+		type(sysdata), intent(inout)							:: sys
+		integer(bigint), intent(inout)							:: noccs
+		real(dbl), intent(in)									:: emin, emax
+		integer(smallint), dimension(sys%nlevels), intent(in)	:: occ
+		real(dbl), dimension(sys%mm%chunk_size), intent(inout)	:: enlist
 			
-		integer							:: outix
-		real(dbl)						:: en
-		character(len=:), allocatable	:: hash_str
-		call get_hash(n, occlist(1:n, noccs+1), hash_str)
-		call tbl%get(hash_str, outix)
-		if (outix == 0) then
-			en = energy(n, values, values, occlist(:, noccs+1))
-			if ((en > emin) .and. (en < emax)) then
-				noccs = noccs + 1
-				call tbl%put(hash_str, int(noccs))
-				enlist(noccs) = en
+		integer		:: i, outnocc
+		real(dbl)	:: en
+		en = energy(sys%nlevels, sys%energies, sys%energies, occ(:))
+		if ((en > emin) .and. (en < emax)) then
+			noccs = noccs + 1
+			
+			if (noccs .gt. sys%mm%chunk_size) then
+				call sys%mm%block_swap(sys%energies, sys%hrfactors, noccs-1, outnocc)
+				do i=1,outnocc
+					enlist(i) = energy(sys%nlevels, sys%energies, sys%energies, sys%mm%current_block(:, i))
+				end do
+				write(*, '(1x,a,1x,i10,1x,a,1x,i10)') 'Kept top', outnocc, 'samples out of', noccs
+				noccs = outnocc + 1
 			end if
+			
+			sys%mm%current_block(:, noccs) = occ(:)
+			enlist(noccs) = en
 		end if
 	end subroutine add_occ
 	
@@ -70,16 +73,14 @@ contains
 		call n_random_ints_weighted(sum(plusminus), sys%nlevels, plusminus, weights, indices)
 	end subroutine weighted_indices
 	
-	subroutine do_sample(sys, guesses, occs, guess_ens, emin, emax, ixfunc, tbl, occlist, enlist, noccs)
-		type(sysdata), intent(in)									:: sys
-		integer(smallint), dimension(sys%nlevels), intent(in)					:: occs
-		integer(smallint), dimension(n_guesses, sys%nlevels), intent(in)		:: guesses
-		real(dbl), intent(in)										:: emin, emax
-		real(dbl), dimension(n_guesses), intent(in)					:: guess_ens
-		integer(smallint), dimension(sys%nlevels, sys%nsamples), intent(out)	:: occlist
-		real(dbl), dimension(sys%nsamples), intent(out)				:: enlist
-		integer(bigint), intent(out)								:: noccs
-		type(hash_tbl_sll), intent(out)								:: tbl
+	subroutine do_sample(sys, guesses, occs, guess_ens, emin, emax, ixfunc, enlist, noccs)
+		type(sysdata), intent(inout)										:: sys
+		integer(smallint), dimension(sys%nlevels), intent(in)				:: occs
+		integer(smallint), dimension(n_guesses, sys%nlevels), intent(in)	:: guesses
+		real(dbl), intent(in)												:: emin, emax
+		real(dbl), dimension(n_guesses), intent(in)							:: guess_ens
+		real(dbl), dimension(sys%mm%chunk_size), intent(out)				:: enlist
+		integer(bigint), intent(out)										:: noccs
 			
 		interface
 			subroutine ixfunc(sys, occ, plusminus, indices)
@@ -91,46 +92,71 @@ contains
 			end subroutine
 		end interface
 		
-		integer								:: jx, kx, lx, enix, occix, sn, npm
-		integer, dimension(2)				:: pmix
-		integer, dimension(2*maxnchange)	:: ixes
-		real(dbl)							:: delta, delta_minus, delta_plus
-		character(len=:), allocatable		:: hash_str
+		integer										:: jx, kx, lx, enix, occix, sn, npm, tmp, mergerecord
+		integer, dimension(2)						:: pmix
+		integer, dimension(2*maxnchange)			:: ixes
+		integer, dimension(:), allocatable			:: indices
+		integer(smallint), dimension(sys%nlevels)	:: cocc
+		real(dbl)									:: delta, delta_minus, delta_plus, pct
+		character(len=100)							:: mergefile
 		
-		if (.not. tbl%is_init) call tbl%init(sys%nsamples)
 		noccs = 0
 		do jx=1,n_guesses
-			occlist(:, noccs+1) = guesses(jx, :)
-			call add_occ(sys%nlevels, sys%energies, emin, emax, sys%nsamples, noccs, occlist, enlist, tbl)
+			call add_occ(sys, emin, emax, noccs, guesses(jx, :), enlist)
 		end do
 		
 		do jx=1,sys%nsamples
-			if (mod(jx, print_frequency) .eq. 1) call progress_bar_time(int(jx, kind=bigint), int(sys%nsamples, kind=bigint))
+			if (mod(jx, print_frequency/10) .eq. 0) then
+				pct = real(jx)/real(sys%nsamples) * 100.0
+				write(*, '(1x,a,1x,i12,1x,a,1x,f5.1,1x,a)') 'Done', jx, 'samples (', pct, '%)'
+			end if
 			
 			occix = random_int(1, int(noccs))
-			call ixfunc(sys, occlist(:, occix), pmix, ixes)
+			call ixfunc(sys, sys%mm%current_block(:, occix), pmix, ixes)
 			delta_minus = (emin - enlist(occix)) * damping
 			delta_plus  = (emax - enlist(occix)) * damping
 			delta = 0d0
-			occlist(:, noccs+1) = occlist(:, occix)
+			cocc(:) = sys%mm%current_block(:, occix)
 			npm = sum(pmix)
 			do kx=1,npm
 				enix = ixes(kx)
 				sn 	 = (2*mod(kx, 2) - 1) * sign(1, pmix(1)-1) * sign(1, pmix(2)-1)
 				lx 	 = mod(3-2*sn, 3)
 				pmix(lx) = pmix(lx) - 1
-				lx = occlist(enix, noccs+1) + sn
+				lx = cocc(enix) + sn
 				if ((lx .ge. 0) .and. (lx .le. occs(enix))) then
 					delta = delta + sn*sys%energies(enix)
-					occlist(enix, noccs+1) = lx
+					cocc(enix) = lx
 					if ((delta .gt. delta_minus) .and. (delta .lt. delta_plus)) then
-						call add_occ(sys%nlevels, sys%energies, emin, emax, sys%nsamples, noccs, occlist, enlist, tbl)
+						call add_occ(sys, emin, emax, noccs, cocc, enlist)
 					end if
 				end if
 			end do
 		end do
-		call progress_bar_time(int(sys%nsamples, kind=bigint), int(sys%nsamples, kind=bigint))
 		write(*, *) '\n'
+		
+		! Now we need to write the last file and merge all the files
+		call sys%mm%block_swap(sys%energies, sys%hrfactors, noccs-1, tmp)
+		call sys%mm%merge_all(sys%energies, sys%hrfactors, mergefile, mergerecord)
+		
+		! Calculate rate from merged occ file
+		call sys%mm%read_from_bin(sys%nlevels, mergerecord, sys%mm%current_block, sys%energies, sys%hrfactors, mergefile)
+		allocate(indices(sys%mm%chunk_size))
+		call sys%mm%sort_and_screen(sys%energies, sys%hrfactors, emin, sys%mm%chunk_size, noccs, indices, energy)
+		
+		write(*, *) 'Cleaning up temporary files'
+		call sys%mm%clean_up('occs', minix=1, maxix=sys%mm%current_record-1)
+		if (mergefile .eq. 'merged') call sys%mm%clean_up('merged', minix=1, maxix=mergerecord)
+		
+		write(*, *) 'Calculating rate'
+		call sys%calculate_kic(noccs, sys%mm%current_block(:, indices(:noccs)), init=.false., stopix=noccs)
+		
+		if (sys%do_write) then
+			write(*, *) 'Writing final, unique occs to file'
+			sys%mm%current_record = 1
+			call sys%mm%write_to_bin(sys%mm%current_block, indices(:noccs))
+		end if
+		
 	end subroutine do_sample
 	
 	subroutine get_hash(n, occ, hash_str)

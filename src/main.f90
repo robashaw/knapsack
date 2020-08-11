@@ -12,7 +12,7 @@ program main
 	integer(smallint), dimension(:, :), allocatable 	:: occlist
 	real(dbl), dimension(:), allocatable	:: enlist
 	integer(smallint), dimension(:, :), allocatable	:: guesses
-	integer									:: ix, noccs
+	integer									:: ix, noccs, tmp
 	integer(bigint)							:: worst_case, bignoccs
 	real(dbl)								:: emin, emax, start, finish, target_en
 	real(dbl), dimension(n_guesses)			:: guess_ens
@@ -67,9 +67,9 @@ program main
 			
 			if (sys%debug_level .gt. 0) then
 				write(*, *)
-				write(*, '(a10,1x,a)') 'ENERGY', 'MAX. OCC.'
+				write(*, '(a10,1x,a9,1x,a10)') 'ENERGY', 'MAX. OCC.', 'HR FACTOR'
 				do ix=1,sys%nlevels
-					write(*, '(f10.6,1x,i9)') sys%energies(ix), sys%maxoccs(ix)
+					write(*, '(f10.6,1x,i9,1x,f10.6)') sys%energies(ix), sys%maxoccs(ix), sys%hrfactors(ix)
 				end do
 			end if
 			
@@ -85,6 +85,7 @@ program main
 			case ('brute')
 				call brute_force(sys, emax, emin, enlist, noccs)
 			case ('stochastic')
+				sys%mm%keep_top = .true.
 				sys%maxoccs = [(min(n_cut_guess, sys%cutoffs(ix, sys%nthresh+1)), ix=1,sys%nlevels)]
 				allocate(guesses(n_guesses, sys%nlevels))
 				write(*, '(1x,a,i2)') "Generating guesses with ncut = ", n_cut_guess
@@ -94,16 +95,16 @@ program main
 					write (*, *) guesses(ix, :), guess_ens(ix)
 				end do
 				sys%maxoccs = [(sys%cutoffs(ix, sys%nthresh+1), ix=1,sys%nlevels)]
-				write(*, *) "Sampling"
-				allocate(occlist(sys%nlevels, sys%nsamples)) 
+				write(*, '(1x,a,1x,i20,1x,a)') "\nSampling with", sys%nsamples, "samples\n"
 				allocate(enlist(sys%nsamples))
 				select case (sys%weighting)
-				case ('fc')
-					call do_sample(sys, guesses, sys%maxoccs, guess_ens, emin, emax, weighted_indices, tbl, occlist, enlist, bignoccs)
+				case ('uniform')
+					call do_sample(sys, guesses, sys%maxoccs, guess_ens, emin, emax, uniform_indices, enlist, bignoccs)
 				case default
-					call do_sample(sys, guesses, sys%maxoccs, guess_ens, emin, emax, uniform_indices, tbl, occlist, enlist, bignoccs)
+					call do_sample(sys, guesses, sys%maxoccs, guess_ens, emin, emax, weighted_indices, enlist, bignoccs)
 				end select
 				bignoccs = bignoccs + 1
+				noccs = sys%mm%chunk_size
 			case ('fixedn')
 				worst_case = sys%maxnoccs
 				call screened_fixed_n(sys, emax, emin, enlist, noccs, worst_case)
@@ -112,7 +113,7 @@ program main
 				sys%mm%nrecords = sys%nrecords
 				write(*, '(1x,a,1x,i4,1x,a)') 'Looking for', sys%mm%nrecords, 'records'
 				do ix=1,sys%mm%nrecords
-					call sys%mm%read_from_bin(sys%nlevels, ix, sys%mm%current_block, sys%energies, sys%hrfactors)
+					call sys%mm%read_from_bin(sys%nlevels, ix, sys%mm%current_block, sys%energies, sys%hrfactors, 'occs')
 					call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=sys%mm%chunk_size)
 					noccs = noccs + sys%mm%chunk_size
 				end do
@@ -120,11 +121,11 @@ program main
 				worst_case = sys%maxnoccs 
 				call screened_brute_force(sys, emax, emin, enlist, noccs, worst_case)
 			end select
-			if (sys%algorithm .ne. 'fromfile') then
+			if ((sys%algorithm .ne. 'fromfile') .and. (sys%algorithm .ne. 'stochastic')) then
 				write(*, '(1x,a,1x,i10)') 'Finished block', sys%mm%current_record
 				call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=noccs-1)
 				if (sys%do_write) then
-					call sys%mm%block_swap(sys%energies, sys%hrfactors, noccs-1)
+					call sys%mm%block_swap(sys%energies, sys%hrfactors, noccs-1, tmp)
 				else
 					sys%mm%current_record = sys%mm%current_record + 1
 					sys%mm%current_block = 0
@@ -133,7 +134,11 @@ program main
 				noccs = (sys%mm%current_record-2)*sys%mm%chunk_size+noccs-1
 			end if
 			
-			write (*, '(1x,a,1x,i10,1x,a)') 'Found approximately', noccs, 'occs'
+			if (sys%algorithm .eq. 'stochastic') then
+				write (*, '(1x,a,1x,i10,1x,a)') 'Found approximately', bignoccs, 'occs'
+			else
+				write (*, '(1x,a,1x,i10,1x,a)') 'Found approximately', noccs, 'occs'
+			end if
 			write (*, *)
 			write (*, *) 'Calculating non-radiative rate'
 			sys%k_ic = 4d0 * sys%k_ic / sys%gamma 

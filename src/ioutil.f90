@@ -18,6 +18,8 @@ module ioutil
 		procedure	:: write_to_bin => mm_write_to_bin
 		procedure	:: read_from_bin => mm_read_from_bin
 		procedure	:: merge_files => mm_merge_files
+		procedure	:: merge_all => mm_merge_all
+		procedure	:: clean_up => mm_clean_up
 	end type memorymanager
 	
 contains
@@ -173,14 +175,33 @@ contains
 		write(*, '(A12,I10,A13,I10,A12)') 'Anticipating', mm%nrecords, 'records with', mm%chunk_size, 'occs each'
 	end subroutine mm_init
 	
-	subroutine mm_record_name(mm, filename, record)
+	subroutine mm_record_name(mm, filename, record, prefix)
 		class(memorymanager), intent(inout)	:: mm
+		character(len=*), intent(in)		:: prefix
 		character(len=*), intent(out)		:: filename
 		integer, intent(in)					:: record
 		
 		write(filename, *) record
-		filename = 'occs.' // trim(adjustl(filename))
+		filename = trim(adjustl(prefix)) // '.' // trim(adjustl(filename))
 	end subroutine mm_record_name
+	
+	subroutine mm_clean_up(mm, prefix, minix, maxix)
+		class(memorymanager), intent(inout)	:: mm
+		character(len=*), intent(in)		:: prefix
+		integer, intent(in)					:: minix, maxix
+		
+		integer				:: jx, ios
+		character(len=100)	:: tmpfile
+		
+		do jx=minix,maxix
+			call mm%record_name(tmpfile, jx, prefix)
+			open(unit=occs_unit, iostat=ios, file=tmpfile, status='old')
+			if (ios == 0) then
+				close(occs_unit, status='delete')
+				write(*, '(1x,a,1x,a)') 'Deleted', tmpfile
+			end if
+		end do
+	end subroutine mm_clean_up
 	
 	subroutine mm_sort_and_screen(mm, levels, hrfactors, thresh, max_ix_in, max_ix_out, indices, func)
 		class(memorymanager), intent(inout)				:: mm
@@ -202,7 +223,9 @@ contains
 		
 		! Calculate values using func
 		real(dbl), dimension(max_ix_in) :: values
+		integer(smallint), dimension(mm%nlevels) :: cocc, lastocc
 		integer :: ix
+		integer, dimension(max_ix_in)	:: unique_indices
 		do ix=1,max_ix_in
 			values(ix) = -func(mm%nlevels, levels, hrfactors, mm%current_block(:, ix))
 		end do
@@ -213,23 +236,36 @@ contains
 		
 		! find the cutoff index
 		max_ix_out = 1
-		main: do
-			if (-values(max_ix_out) .gt. thresh) then
-				max_ix_out = max_ix_out + 1
+		ix = 1
+		lastocc = 0
+		unique_indices = 0
+		main: do while (ix .le. max_ix_in)
+			cocc(:) = mm%current_block(:,indices(ix))
+			if (-values(ix) .gt. thresh) then
+				if ((sum(abs(cocc - lastocc)) .ne. 0) .and. (sum(cocc) .ne. 0)) then
+					unique_indices(max_ix_out) = indices(ix)
+					max_ix_out = max_ix_out + 1
+					lastocc(:) = cocc(:)
+				end if
+				ix = ix + 1
 			else 
 				exit main
 			end if
 		end do main
+		max_ix_out = max_ix_out - 1
+		indices(1:max_ix_out) = unique_indices(1:max_ix_out)
 	end subroutine mm_sort_and_screen
 	
-	subroutine mm_block_swap(mm, levels, hrfactors, max_ix_in)
+	subroutine mm_block_swap(mm, levels, hrfactors, max_ix_in, max_ix_out)
 		class(memorymanager), intent(inout)				:: mm
 		real(dbl), dimension(mm%nlevels), intent(in)	:: levels, hrfactors
 		integer, intent(in)								:: max_ix_in
+		integer, intent(out)							:: max_ix_out
 		
-		integer	:: max_ix_out, ix
+		integer	:: ix
 		integer, dimension(max_ix_in) 	:: indices
 		integer, dimension(mm%nlevels)	:: tmp_occ
+		integer(smallint), dimension(mm%nlevels, topkeep) :: thetop
 		
 		! check if there is currently a block
 		if (allocated(mm%current_block)) then
@@ -244,15 +280,23 @@ contains
 			end select
 			
 			! we now only need to write the current block to file up to max_ix
-			call mm%write_to_bin(mm%current_block, indices(:max_ix_out))
-			! reset the block and increment counter
-			mm%current_record = mm%current_record + 1
-			if (mm%keep_top .and. (max_ix_out .lt. mm%chunk_size)) then
-				! stochastic case need to keep the 'top' records
-				mm%current_block(:, max_ix_out+1:) = 0
+			if (max_ix_out .eq. 0) then
+				write(*, *) 'Nothing to write'
 			else 
-				mm%current_block = 0
-			end if 
+				call mm%write_to_bin(mm%current_block, indices(:max_ix_out))
+				! reset the block and increment counter
+				mm%current_record = mm%current_record + 1
+				if (mm%keep_top .and. (max_ix_out .lt. mm%chunk_size)) then
+					! stochastic case need to keep the 'top' records
+					ix = min(max_ix_out, topkeep)
+					thetop(:, :ix) = mm%current_block(:, indices(:ix))
+					mm%current_block = 0
+					mm%current_block(:, :ix) = thetop(:, :ix)
+					max_ix_out = ix
+				else 
+					mm%current_block = 0
+				end if 
+			end if
 		else
 			! allocate the first block
 			allocate(mm%current_block(mm%nlevels, mm%chunk_size))
@@ -268,7 +312,7 @@ contains
 		character(len=100) :: filename
 		integer	:: ios
 		
-		call mm%record_name(filename, mm%current_record)
+		call mm%record_name(filename, mm%current_record, 'occs')
 		open(unit=output_unit, file=filename, form='unformatted', access='stream')
 		
 		if (size(indices) .eq. 0) then
@@ -283,13 +327,15 @@ contains
 		else
 			write(*, *) 'Successfully wrote record ', filename
 		end if
+		write(*, *) "\n"
 	end subroutine mm_write_to_bin
 	
-	subroutine mm_read_from_bin(mm, n, record, occs, levels, hrfactors)
+	subroutine mm_read_from_bin(mm, n, record, occs, levels, hrfactors, prefix)
 		class(memorymanager), intent(inout)								:: mm
 		integer, intent(in)												:: n, record
 		integer(smallint), dimension(:, :), allocatable, intent(out) 	:: occs
 		real(dbl), dimension(mm%nlevels), intent(in)					:: levels, hrfactors
+		character(len=*), intent(in)									:: prefix
 		
 		integer	:: ios, nrows, i, filesize
 		integer(smallint) :: firstrow(n)
@@ -297,12 +343,13 @@ contains
 		character(len=100) :: filename
 		
 		
-		call mm%record_name(filename, record)
+		call mm%record_name(filename, record, prefix)
 		open(unit=occs_unit, file=filename, form='unformatted', access='stream', iostat=ios)
 		if (ios .eq. 0) then
 			inquire(occs_unit, size=filesize)
 			read(occs_unit) firstrow
 			nrows = filesize / sizeof(firstrow)
+			if (nrows .gt. mm%chunk_size) write(*, *) 'Warning: file needs more memory than is available'
 			if (allocated(occs)) then
 				deallocate(occs)
 			end if
@@ -323,6 +370,7 @@ contains
 			close(occs_unit)
 			
 			write(*, *) 'Successfully read record ', trim(filename), ' with dimensions ', shape(occs)
+			write(*, *) "\n"
 			
 			if (mm%dumplevel .eq. 1) then
 				write(*, *) 'OCCUPATIONS'
@@ -342,6 +390,42 @@ contains
 		end if
 	end subroutine mm_read_from_bin
 	
+	subroutine mm_merge_all(mm, levels, hrfactors, outfile, outrecord)
+		class(memorymanager), intent(inout)				:: mm
+		real(dbl), dimension(mm%nlevels), intent(in)	:: levels, hrfactors
+		character(len=*), intent(out)					:: outfile
+		integer, intent(out)							:: outrecord
+		
+		integer ::	occ_record, merge_record
+		character(len=100) :: file1, file2, file3
+		if (mm%current_record .eq. 2) then
+			outfile = 'occs'
+			outrecord = 1
+		else
+			if (mm%screening_type .eq. 'energy') then
+				call mm%merge_files('occs.1', 'occs.2', 'merged.1', levels, hrfactors, energy)
+			else
+				call mm%merge_files('occs.1', 'occs.2', 'merged.1', levels, hrfactors, franck_condon)
+			end if
+			
+			merge_record = 1
+			do occ_record = 3,(mm%current_record-1)
+				call mm%record_name(file1, record=merge_record, prefix='merged')
+				call mm%record_name(file2, record=occ_record, prefix='occs')
+				call mm%record_name(file3, record=merge_record+1, prefix='merged')
+				if (mm%screening_type .eq. 'energy') then
+					call mm%merge_files(file1, file2, file3, levels, hrfactors, energy)
+				else
+					call mm%merge_files(file1, file2, file3, levels, hrfactors, franck_condon)
+				end if
+				merge_record = merge_record + 1
+			end do 
+			
+			outfile = 'merged'
+			outrecord = merge_record
+		end if 
+	end subroutine mm_merge_all
+	
 	subroutine mm_merge_files(mm, file1, file2, outfile, levels, hrfactors, func)
 		class(memorymanager), intent(inout)	:: mm
 		character(len=*), intent(in)		:: file1, file2, outfile
@@ -358,12 +442,12 @@ contains
 		end interface
 		
 		integer 			:: maxrecords, ios, nrows1, nrows2, i, filesize, delta
-		integer				:: size1, size2, ptr1=1, ptr2=1, start1=2, start2=2, ctr1=0, ctr2=0
+		integer				:: size1, size2, ptr1, ptr2, start1, start2, ctr1, ctr2
 		integer(smallint) 	:: firstrow(mm%nlevels), sizer=0
 		real(dbl)			:: val1, val2
 		integer(smallint), dimension(:, :), allocatable	:: f1occs, f2occs
 		
-		write(*, '(1x,a,1x,a,1x,a,1x,a)') 'Merging', file1, 'and', file2
+		write(*, '(1x,a,1x,a,1x,a,1x,a)') 'Merging', trim(adjustl(file1)), 'and', trim(adjustl(file2))
 		
 		! calculate how many records can open from each file
 		maxrecords = floor(0.5 * mm%max_memory * (1024**3) / (sizeof(sizer) * mm%nlevels))
@@ -372,6 +456,12 @@ contains
 		open(unit=occs_unit_2, file=file2, form='unformatted', access='stream', iostat=ios)
 		open(unit=output_unit, file=outfile, form='unformatted', access='stream')
 		if (ios .eq. 0) then
+			ptr1 = 1
+			ptr2 = 1
+			start1 = 2
+			start2 = 2
+			ctr1 = 0
+			ctr2 = 0
 			! file 1 nrecords
 			inquire(occs_unit, size=filesize)
 			read(occs_unit) firstrow

@@ -148,7 +148,7 @@ contains
 	subroutine sysdata_init(sys)
 		class(sysdata), intent(inout)	:: sys
 		
-		integer	:: ix
+		integer	:: ix, tmp
 		real(dbl)	:: nestimate
 		real(dbl), dimension(sys%nlevels) :: unsorted_levels
 		
@@ -196,7 +196,7 @@ contains
 			end if
 			
 			call sys%mm%initialise(sys%nlevels, sys%maxnoccs, sys%memory, sys%nthresh)
-			call sys%mm%block_swap(sys%energies, sys%hrfactors, sys%mm%chunk_size)
+			call sys%mm%block_swap(sys%energies, sys%hrfactors, sys%mm%chunk_size, tmp)
 		end if
 	end subroutine sysdata_init
 	
