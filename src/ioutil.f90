@@ -1,6 +1,6 @@
 module ioutil
 	use constants
-	use random
+	use randomness
 	implicit none
 	
 	type memorymanager

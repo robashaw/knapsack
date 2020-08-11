@@ -4,8 +4,11 @@ program main
 	use radiative
 	use sample
 	use knapsack 
-	use ioutil
-	
+        use ioutil
+#ifdef __INTEL_COMPILER
+        use ifport
+#endif
+        
 	character(len=100)						:: arg
 	integer									:: ios
 	type(sysdata)							:: sys
@@ -18,13 +21,13 @@ program main
 	real(dbl), dimension(n_guesses)			:: guess_ens
 	type(hash_tbl_sll) 						:: tbl
 	
-	character(8)  :: date
-	character(10) :: time
-	call date_and_time(date, time)
+	character(8)  :: datechar
+	character(10) :: timechar
+	call date_and_time(datechar, timechar)
 	write (*, *) 'KNAPSACK, version 1.02, Aug 2020'
 	write (*, *) 'by Robert A. Shaw'
-	write (*, '(1x, a, 2x, 5a, 2x, 5a)') 'Called at:', date(1:4), '/', date(5:6), '/', date(7:8), &
-		 											   time(1:2), ':', time(3:4), ':', time(5:6)
+	write (*, '(1x, a, 2x, 5a, 2x, 5a)') 'Called at:', datechar(1:4), '/', datechar(5:6), '/', datechar(7:8), &
+		 											   timechar(1:2), ':', timechar(3:4), ':', timechar(5:6)
 	
 	call get_command_argument(1, arg, status=ios)
 	if (ios .eq. 0) then

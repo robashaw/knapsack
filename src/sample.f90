@@ -1,7 +1,7 @@
 module sample
 	use constants
 	use ioutil, only : energy
-	use random
+	use randomness
 	use progress, only : progress_bar_time
 	use hashtbl
 	use nonradiative

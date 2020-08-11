@@ -1,6 +1,9 @@
-module random
-	use constants, only : dbl, bigint
-	implicit none
+module randomness
+  use constants, only : dbl, bigint
+#ifdef __INTEL_COMPILER
+  use ifport
+#endif
+  implicit none
 contains
 	function random_int(min, max)
 		integer(bigint), intent(in) :: min
@@ -73,5 +76,5 @@ contains
 
 		deallocate(expanded_ints)
 	end subroutine n_random_ints_weighted
-end module random
+end module randomness
 
