@@ -24,7 +24,7 @@ include(CheckIncludeFiles)
 
 # we need at least F03
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-    set(dialect "-ffree-form -fbackslash -fimplicit-none -fdefault-integer-8 -std=f2008 -Wno-tabs")
+    set(dialect "-ffree-form -fbackslash -fimplicit-none -fdefault-integer-8 -cpp -Wno-tabs")
     set(bounds "-fbounds-check")
 endif()
 if(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")

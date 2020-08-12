@@ -4,9 +4,9 @@ program main
 	use radiative
 	use sample
 	use knapsack 
-        use ioutil
+	use ioutil
 #ifdef __INTEL_COMPILER
-        use ifport
+	use ifport
 #endif
         
 	character(len=100)						:: arg
@@ -15,7 +15,7 @@ program main
 	integer(smallint), dimension(:, :), allocatable 	:: occlist
 	real(dbl), dimension(:), allocatable	:: enlist
 	integer(smallint), dimension(:, :), allocatable	:: guesses
-	integer									:: ix, noccs, tmp
+	integer									:: ix, noccs, ntot, tmp
 	integer(bigint)							:: worst_case, bignoccs
 	real(dbl)								:: emin, emax, start, finish, target_en
 	real(dbl), dimension(n_guesses)			:: guess_ens
@@ -116,9 +116,8 @@ program main
 				sys%mm%nrecords = sys%nrecords
 				write(*, '(1x,a,1x,i4,1x,a)') 'Looking for', sys%mm%nrecords, 'records'
 				do ix=1,sys%mm%nrecords
-					call sys%mm%read_from_bin(sys%nlevels, ix, sys%mm%current_block, sys%energies, sys%hrfactors, 'occs')
-					call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=sys%mm%chunk_size)
-					noccs = noccs + sys%mm%chunk_size
+					call sys%calculate_from_file(ix, 'occs', ntot)
+					noccs = noccs + ntot
 				end do
 			case default
 				worst_case = sys%maxnoccs 

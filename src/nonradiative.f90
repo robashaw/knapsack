@@ -15,7 +15,7 @@ module nonradiative
 		real(dbl), dimension(:, :), allocatable			:: fcfactors
 		real(dbl), dimension(:, :, :), allocatable		:: Bvqj
 		integer, dimension(:, :), allocatable			:: cutoffs, bounds
-		integer, dimension(:), allocatable				:: energy_order
+		integer(sint), dimension(:), allocatable		:: energy_order
 		integer(smallint), dimension(:), allocatable	:: minoccs, maxoccs
 		type(memorymanager)								:: mm
 	contains
@@ -26,6 +26,7 @@ module nonradiative
 		procedure	:: compute_zn => sysdata_compute_zn
 		procedure	:: build_V => sysdata_build_V
 		procedure	:: calculate_kic => sysdata_calc_kic
+		procedure	:: calculate_from_file => sysdata_calc_from_file
 		procedure	:: calculate_gamma => sysdata_calc_gamma
 		procedure	:: get_next_bound => sysdata_get_next_bound
 		procedure	:: screened_ncombinations => sysdata_ncombinations
@@ -196,6 +197,7 @@ contains
 			end if
 			
 			call sys%mm%initialise(sys%nlevels, sys%maxnoccs, sys%memory, sys%nthresh)
+			if (sys%algorithm .eq. 'stochastic') sys%mm%notunique = .true.
 			call sys%mm%block_swap(sys%energies, sys%hrfactors, sys%mm%chunk_size, tmp)
 		end if
 	end subroutine sysdata_init
@@ -372,6 +374,29 @@ contains
 	
 		sys%gamma = SQRT_8LN2 * sqrt(sys%gamma)
 	end subroutine sysdata_calc_gamma
+	
+	subroutine sysdata_calc_from_file(sys, record, prefix, ntot)
+		class(sysdata), intent(inout)	:: sys
+		integer, intent(in)				:: record
+		character(len=*), intent(in)	:: prefix
+		integer, intent(out)			:: ntot
+		
+		integer	:: nrows, nchunk, ix, startrow, endrow
+		
+		call sys%mm%get_nrows(sys%nlevels, record, prefix, nrows)
+		write(*, *) 'Reading from file, expecting ', nrows, ' rows'
+		startrow = 1
+		endrow = min(sys%mm%chunk_size, nrows)-1
+		ntot = 0
+		main: do while (ntot .lt. nrows)
+			nchunk = endrow - startrow + 1
+			call sys%mm%read_from_bin(sys%nlevels, record, sys%mm%current_block, sys%energies, sys%hrfactors, prefix, startrow, endrow)
+			call sys%calculate_kic(nchunk, sys%mm%current_block, init=.false., stopix=nchunk)
+			ntot = ntot + nchunk
+			startrow = endrow + 1
+			endrow = startrow + min(nrows - ntot, sys%mm%chunk_size) - 1
+		end do main
+	end subroutine sysdata_calc_from_file
 	
 	subroutine sysdata_calc_kic(sys, noccs, occs, init, stopix)
 		class(sysdata), intent(inout)						:: sys

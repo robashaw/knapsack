@@ -95,7 +95,6 @@ contains
 		integer										:: jx, kx, lx, enix, occix, sn, npm, tmp, mergerecord
 		integer, dimension(2)						:: pmix
 		integer, dimension(2*maxnchange)			:: ixes
-		integer, dimension(:), allocatable			:: indices
 		integer(smallint), dimension(sys%nlevels)	:: cocc
 		real(dbl)									:: delta, delta_minus, delta_plus, pct
 		character(len=100)							:: mergefile
@@ -140,23 +139,17 @@ contains
 		call sys%mm%merge_all(sys%energies, sys%hrfactors, mergefile, mergerecord)
 		
 		! Calculate rate from merged occ file
-		call sys%mm%read_from_bin(sys%nlevels, mergerecord, sys%mm%current_block, sys%energies, sys%hrfactors, mergefile)
-		allocate(indices(sys%mm%chunk_size))
-		call sys%mm%sort_and_screen(sys%energies, sys%hrfactors, emin, sys%mm%chunk_size, noccs, indices, energy)
+		write(*, *) 'Calculating rate'
+		call sys%calculate_from_file(mergerecord, mergefile, noccs)
+		
+		if (sys%do_write) then
+			write(*, *) 'Saving final, unique occs to file'
+			call sys%mm%move_file(mergefile, mergerecord, 'occs.final')
+		end if
 		
 		write(*, *) 'Cleaning up temporary files'
 		call sys%mm%clean_up('occs', minix=1, maxix=sys%mm%current_record-1)
 		if (mergefile .eq. 'merged') call sys%mm%clean_up('merged', minix=1, maxix=mergerecord)
-		
-		write(*, *) 'Calculating rate'
-		call sys%calculate_kic(noccs, sys%mm%current_block(:, indices(:noccs)), init=.false., stopix=noccs)
-		
-		if (sys%do_write) then
-			write(*, *) 'Writing final, unique occs to file'
-			sys%mm%current_record = 1
-			call sys%mm%write_to_bin(sys%mm%current_block, indices(:noccs))
-		end if
-		
 	end subroutine do_sample
 	
 	subroutine get_hash(n, occ, hash_str)

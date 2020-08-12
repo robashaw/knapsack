@@ -1,31 +1,31 @@
 module randomness
-  use constants, only : dbl, bigint
+	use constants, only : dbl, bigint
 #ifdef __INTEL_COMPILER
-  use ifport
+        use ifport
 #endif
-  implicit none
+	implicit none
 contains
-	function random_int(min, max)
-		integer(bigint), intent(in) :: min
-		integer(bigint), intent(in) :: max
+	function random_int(minv, maxv)
+		integer(bigint), intent(in) :: minv
+		integer(bigint), intent(in) :: maxv
 		integer(bigint)		:: random_int
 		real(dbl)			:: rn, scale 
 		
 		rn     = rand()
-		scale  = max-min
-		random_int = min + floor(rn*scale)
+		scale  = maxv-minv
+		random_int = minv + floor(rn*scale)
 	end function random_int
 	
-	subroutine n_random_ints(n, min, max, res)
-		integer(bigint), intent(in)							:: n, min, max
+	subroutine n_random_ints(n, minv, maxv, res)
+		integer(bigint), intent(in)							:: n, minv, maxv
 		integer(bigint), dimension(n), intent(out) 	:: res
 		
 		real(dbl)	:: rn, scale
 		integer(bigint)		:: ix
-		scale = max - min
+		scale = maxv - minv
 		do ix=1, n
 			rn = rand()
-			res(ix) = min + floor(rn*scale)
+			res(ix) = minv + floor(rn*scale)
 		end do
 	end subroutine n_random_ints
 	
