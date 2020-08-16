@@ -1,7 +1,6 @@
 module knapsack
 	use constants, only : dbl, bigint, print_frequency
 	use ioutil, only : ncombinations
-	use progress, only : progress_bar_time
 	use nonradiative
 	implicit none
 contains
@@ -182,8 +181,6 @@ contains
 		checked = 0
 		write(*, '(1x,a,1x,e12.4,1x,a)') 'Estimated', real(max_nocc), 'occupations to check'
 		call iterate(sys, occsize, emax, emin, cocc, 1, enlist, noccs, checked, max_nocc)
-		!call progress_bar_time(max_nocc, max_nocc)
-		write(*, *)
 	end subroutine brute_force
 	
 	subroutine screened_brute_force(sys, emax, emin, enlist, noccs, worst_case)
@@ -206,8 +203,6 @@ contains
 		checked = 0
 		write(*, '(1x,a,1x,e12.4)') 'Worst case no. of occs to check:', real(worst_case)
 		call screened_iterate(sys, occsize, emax, emin, cocc, 1, enlist, noccs, checked, max_nocc, sys%maxnfix, fixedn=.false.)
-		!call progress_bar_time(max_nocc, max_nocc)
-		write(*, *)
 	end subroutine screened_brute_force
 	
 	subroutine screened_fixed_n(sys, emax, emin, enlist, noccs, worst_case)
@@ -234,8 +229,6 @@ contains
 			write(*, '(1x,a,1x,i3,1x,a,1x,e12.4,1x,a)') 'Doing N =', nx, 'found', real(noccs-1), 'valid occs so far'
 			call screened_iterate(sys, occsize, emax, emin, cocc, 1, enlist, noccs, checked, max_nocc, nfix=nx, fixedn=.true.)
 		end do
-		!call progress_bar_time(max_nocc, max_nocc)
-		write(*, *)
 	end subroutine
 	
 	recursive subroutine screened_iterate(sys, noccs, emax, emin, occ, ix, enlist, occix, checked, maxnocc, nfix, fixedn)

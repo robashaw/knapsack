@@ -5,40 +5,30 @@ cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 enable_language(Fortran)
 project( knapsack
 	 VERSION 1.0 )
-	 
-# Tell it where to find libs
-set (LIBPATH "/usr/local")
-set (INCPATH "/usr/local")
 
-# required for unit testing
-include(CTest)
-enable_testing()
+# set testing vars
+set(ENABLE_TESTS ON CACHE BOOL "")
+set(ENABLE_GTEST OFF CACHE BOOL "")
+set(ENABLE_FRUIT ON CACHE BOOL "")
+
+# use BLT
+include(blt/SetupBLT.cmake)
 
 # required modules
 include(GNUInstallDirs)
 include(CheckIncludeFile)
 include(CheckIncludeFiles)
 
-#find_package(MPI REQUIRED)
-#include_directories(${MPI_INCLUDE_PATH})
+# set custom compiler flags
 
-# we need at least F03
-if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-    set(dialect "-ffree-form -fbackslash -fimplicit-none -fdefault-integer-8 -cpp -Wno-tabs")
-    set(bounds "-fbounds-check")
-endif()
-if(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
-    set(dialect "-free -i8 -implicitnone -fpp -O2 -assume bscc")
-    set(bounds "-check bounds")
-endif()
-if(CMAKE_Fortran_COMPILER_ID MATCHES "PGI")
-    set(dialect "-Mfreeform -Mdclchk -Mstandard -Mallocatable=03 -Mbackslash")
-    set(bounds "-C")
-endif()
-
-list(APPEND CMAKE_Fortran_FLAGS_DEBUG ${bounds})
-list(APPEND CMAKE_Fortran_FLAGS ${dialect})
+blt_append_custom_compiler_flag(
+	FLAGS_VAR BLT_PROD_FLAGS
+	DEFAULT  "-ffree-form -fbackslash -fimplicit-none -fdefault-integer-8 -cpp -Wno-tabs"
+	INTEL    "-free -i8 -implicitnone -fpp -O2 -assume bscc"
+	PGI      "-Mfreeform -Mdclchk -Mstandard -Mallocatable=03 -Mbackslash")
+list(APPEND CMAKE_Fortran_FLAGS ${BLT_PROD_FLAGS})
 
 # add subdirectories
 add_subdirectory(src)
 add_subdirectory(tests)
+
