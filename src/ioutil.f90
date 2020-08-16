@@ -301,13 +301,18 @@ contains
 		character(len=*), intent(in)		:: prefix, outfile
 		integer, intent(in)					:: record
 		
-		character(len=100)	:: infile
+  character(len=100)	:: infile
+  integer  :: ios
 		call mm%record_name(infile, record, prefix)
 		
 		write(*, '(1x,a,1x,a,1x,a,1x,a)') 'Moving', trim(adjustl(infile)), 'to', trim(adjustl(outfile))
-		call rename(infile, outfile)
-	end subroutine
-	
+#ifdef __INTEL_COMPILER
+        ios = rename(infile, outfile)
+#else
+        call rename(infile, outfile)
+#endif
+        end subroutine mm_move_file
+ 	
 	subroutine mm_purify(mm, levels, hrfactors, max_ix_in, max_ix_out, indices)
 		class(memorymanager), intent(inout)					:: mm
 		integer, intent(in)									:: max_ix_in
