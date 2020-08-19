@@ -2,4 +2,5 @@ build/**
 *.out
 *.log
 *~
+occs.*
 .DS_Store
