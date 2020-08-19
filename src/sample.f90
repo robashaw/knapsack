@@ -142,7 +142,7 @@ contains
 		call sys%calculate_from_file(mergerecord, mergefile, noccs)
 		
 		if (sys%do_write) then
-			tmpfile = sys%mm%occprefix // '.final'
+			tmpfile = trim(adjustl(sys%mm%occprefix)) // '.final'
 			write(*, '(1x,a,1x,a)') 'Saving final, unique occs to file as', tmpfile
 			call sys%mm%move_file(mergefile, mergerecord, tmpfile)
 		end if

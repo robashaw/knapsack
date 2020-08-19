@@ -200,8 +200,11 @@ contains
 				sys%minnfix = ceiling((sys%e_target*TO_EV - sys%delta_e)/(maxval(sys%energies)))
 			end if
 			
+			if (sys%algorithm .eq. 'stochastic') then
+				sys%mm%notunique = .true.
+				sys%memory = 0.5 * sys%memory
+			end if
 			call sys%mm%initialise(sys%nlevels, sys%maxnoccs, sys%memory, sys%nthresh, sys%occprefix)
-			if (sys%algorithm .eq. 'stochastic') sys%mm%notunique = .true.
 			call sys%mm%block_swap(sys%energies, sys%hrfactors, sys%mm%chunk_size, tmp)
 		end if
 	end subroutine sysdata_init
