@@ -43,7 +43,7 @@ contains
 		fac = 1d0
 		if (n .gt. 0) then
 			do ix = 1, n
-				fac = fac * real(n)
+				fac = fac * real(ix)
 			end do
 		end if
 	end function factorial
