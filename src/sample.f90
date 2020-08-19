@@ -96,7 +96,7 @@ contains
 		integer, dimension(2*maxnchange)			:: ixes
 		integer(smallint), dimension(sys%nlevels)	:: cocc
 		real(dbl)									:: delta, delta_minus, delta_plus, pct
-		character(len=100)							:: mergefile
+		character(len=100)							:: mergefile, tmpfile
 		
 		noccs = 0
 		do jx=1,n_guesses
@@ -142,12 +142,13 @@ contains
 		call sys%calculate_from_file(mergerecord, mergefile, noccs)
 		
 		if (sys%do_write) then
-			write(*, *) 'Saving final, unique occs to file'
-			call sys%mm%move_file(mergefile, mergerecord, 'occs.final')
+			tmpfile = sys%mm%occprefix // '.final'
+			write(*, '(1x,a,1x,a)') 'Saving final, unique occs to file as', tmpfile
+			call sys%mm%move_file(mergefile, mergerecord, tmpfile)
 		end if
 		
 		write(*, *) 'Cleaning up temporary files'
-		call sys%mm%clean_up('occs', minix=1, maxix=sys%mm%current_record-1)
+		call sys%mm%clean_up(sys%mm%occprefix, minix=1, maxix=sys%mm%current_record-1)
 		if (mergefile .eq. 'merged') call sys%mm%clean_up('merged', minix=1, maxix=mergerecord)
 	end subroutine do_sample
 	

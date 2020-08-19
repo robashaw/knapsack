@@ -1,7 +1,9 @@
 calculation,	nonradiative
-memory,		0.5
-tofile,		true
-algorithm,	fixedn
+memory,		0.01
+tofile,		false
+occprefix,	potato
+algorithm,	mergefiles
+nrecords,	6
 debug,		2
 weighting,	fc
 energy,		0.1011460

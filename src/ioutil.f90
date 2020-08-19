@@ -11,7 +11,8 @@ module ioutil
 		integer								 			:: nrecords, current_record, nlevels, dumplevel=0
 		integer					      		 			:: chunk_size
 		integer(smallint), dimension(:, :), allocatable :: current_block
-		character(len=10)					  			:: screening_type	
+		character(len=10)					  			:: screening_type
+		character(len=100)								:: occprefix
 		logical								  			:: keep_top, notunique
 	contains
 		procedure	:: initialise => mm_init
@@ -233,11 +234,12 @@ contains
 		end do
 	end subroutine reorder_list
 	
-	subroutine mm_init(mm, n, max_noccs, max_mem, nthresh)
+	subroutine mm_init(mm, n, max_noccs, max_mem, nthresh, occprefix)
 		class(memorymanager), intent(inout)		:: mm
 		integer, intent(in) 					:: n, nthresh
 		integer, intent(in)						:: max_noccs
 		real(dbl), intent(in)					:: max_mem
+		character(len=*), intent(in)			:: occprefix
 		
 		real(dbl) :: mem_estimate
 		integer(smallint)	:: sizer = 0
@@ -247,6 +249,7 @@ contains
 		mm%threshold = 10.0**(-nthresh) ! threshold for screening 
 		mm%keep_top = .false.
 		mm%notunique = .false.
+		mm%occprefix = occprefix
 		
 		! maximum memory availale in GB
 		if (max_mem .gt. 0d0) then
@@ -447,7 +450,7 @@ contains
 			if (max_ix_out .eq. 0) then
 				write(*, *) 'Nothing to write'
 			else 
-				call mm%write_to_bin(mm%current_block, indices(:max_ix_out), mm%current_record, 'occs')
+				call mm%write_to_bin(mm%current_block, indices(:max_ix_out), mm%current_record, mm%occprefix)
 				! reset the block and increment counter
 				mm%current_record = mm%current_record + 1
 				deallocate(mm%current_block)
@@ -591,19 +594,21 @@ contains
 		integer ::	occ_record, merge_record
 		character(len=100) :: file1, file2, file3
 		if (mm%current_record .eq. 2) then
-			outfile = 'occs'
+			outfile = mm%occprefix
 			outrecord = 1
 		else
+			call mm%record_name(file1, record=1, prefix=mm%occprefix)
+			call mm%record_name(file2, record=2, prefix=mm%occprefix)
 			if (mm%screening_type .eq. 'energy') then
-				call mm%merge_files('occs.1', 'occs.2', 'merged.1', levels, hrfactors)
+				call mm%merge_files(file1, file2, 'merged.1', levels, hrfactors)
 			else
-				call mm%merge_files('occs.1', 'occs.2', 'merged.1', levels, hrfactors)
+				call mm%merge_files(file1, file2, 'merged.1', levels, hrfactors)
 			end if
 			
 			merge_record = 1
 			do occ_record = 3,(mm%current_record-1)
 				call mm%record_name(file1, record=merge_record, prefix='merged')
-				call mm%record_name(file2, record=occ_record, prefix='occs')
+				call mm%record_name(file2, record=occ_record, prefix=mm%occprefix)
 				call mm%record_name(file3, record=merge_record+1, prefix='merged')
 				call mm%merge_files(file1, file2, file3, levels, hrfactors)
 				merge_record = merge_record + 1

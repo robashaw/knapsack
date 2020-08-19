@@ -9,13 +9,13 @@ program main
 	use ifport
 #endif
         
-	character(len=100)						:: arg
+	character(len=100)						:: arg, mergefile, tmpfile
 	integer									:: ios
 	type(sysdata)							:: sys
 	integer(smallint), dimension(:, :), allocatable 	:: occlist
 	real(dbl), dimension(:), allocatable	:: enlist
 	integer(smallint), dimension(:, :), allocatable	:: guesses
-	integer									:: ix, noccs, ntot, tmp
+	integer									:: ix, noccs, ntot, tmp, mergerecord
 	integer(bigint)							:: worst_case, bignoccs
 	real(dbl)								:: emin, emax, start, finish, target_en
 	real(dbl), dimension(n_guesses)			:: guess_ens
@@ -112,18 +112,27 @@ program main
 				worst_case = sys%maxnoccs
 				call screened_fixed_n(sys, emax, emin, enlist, noccs, worst_case)
 			case ('fromfile')
-				write(*, '(1x,a)') 'Reading occs from occs.*'
+				tmpfile = trim(adjustl(sys%mm%occprefix)) // '.*'
+				write(*, '(1x,a,1x,a)') 'Reading occs from', tmpfile
 				sys%mm%nrecords = sys%nrecords
 				write(*, '(1x,a,1x,i4,1x,a)') 'Looking for', sys%mm%nrecords, 'records'
 				do ix=1,sys%mm%nrecords
-					call sys%calculate_from_file(ix, 'occs', ntot)
+					call sys%calculate_from_file(ix, sys%mm%occprefix, ntot)
 					noccs = noccs + ntot
 				end do
+			case ('mergefiles')	
+				sys%mm%current_record = sys%nrecords + 1
+				write(*, '(1x,a,1x,a,1x,a,1x,i3)') 'Merging files with prefix', sys%mm%occprefix, 'up to record', sys%mm%nrecords
+				call sys%mm%merge_all(sys%energies, sys%hrfactors, mergefile, mergerecord)
+				tmpfile = trim(adjustl(sys%mm%occprefix)) // '.final'
+				write(*, '(1x,a,1x,a)') 'Saving final, unique occs to file as', tmpfile
+				call sys%mm%move_file(mergefile, mergerecord, tmpfile)
+				if (mergefile .eq. 'merged') call sys%mm%clean_up('merged', minix=1, maxix=mergerecord)
 			case default
 				worst_case = sys%maxnoccs 
 				call screened_brute_force(sys, emax, emin, enlist, noccs, worst_case)
 			end select
-			if ((sys%algorithm .ne. 'fromfile') .and. (sys%algorithm .ne. 'stochastic')) then
+			if ((sys%algorithm .ne. 'fromfile') .and. (sys%algorithm .ne. 'stochastic') .and. (sys%algorithm .ne. 'mergefiles')) then
 				write(*, '(1x,a,1x,i10)') 'Finished block', sys%mm%current_record
 				call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=noccs-1)
 				if (sys%do_write) then

@@ -9,7 +9,7 @@ module nonradiative
 		integer											:: maxnfix, minnfix, nrecords
 		integer(bigint)									:: maxnoccs
 		character(len=100)								:: bfile, gradfile, algorithm, weighting
-		character(len=100)								:: radfile, calctype, radunits, sortby
+		character(len=100)								:: radfile, calctype, radunits, sortby, occprefix
 		real(dbl)										:: k_ic, k_r, e_target, delta_e, gamma, tdm, memory
 		real(dbl), dimension(:), allocatable			:: energies, hrfactors, masses, V_vq_j
 		real(dbl), dimension(:, :), allocatable			:: fcfactors
@@ -59,6 +59,7 @@ contains
 		sys%nrecords = 0
 		sys%maxnfix = -1
 		sys%minnfix = -1
+		sys%occprefix = 'occs'
 	    do while (ios == 0)
 	       read(main_input_unit, '(A)', iostat=ios) buffer
 	       if (ios == 0) then
@@ -85,6 +86,9 @@ contains
          	  case ('weighting')
          		 read(buffer, *, iostat=ios) sys%weighting
          		 sys%weighting = trim(adjustl(sys%weighting))
+              case ('occprefix')
+            	 read(buffer, *, iostat=ios) sys%occprefix
+            	 sys%occprefix = trim(adjustl(sys%occprefix))
 			  case ('calculation')
 			  	 read(buffer, *, iostat=ios) sys%calctype
 				 sys%calctype = trim(adjustl(sys%calctype))
@@ -196,7 +200,7 @@ contains
 				sys%minnfix = ceiling((sys%e_target*TO_EV - sys%delta_e)/(maxval(sys%energies)))
 			end if
 			
-			call sys%mm%initialise(sys%nlevels, sys%maxnoccs, sys%memory, sys%nthresh)
+			call sys%mm%initialise(sys%nlevels, sys%maxnoccs, sys%memory, sys%nthresh, sys%occprefix)
 			if (sys%algorithm .eq. 'stochastic') sys%mm%notunique = .true.
 			call sys%mm%block_swap(sys%energies, sys%hrfactors, sys%mm%chunk_size, tmp)
 		end if
