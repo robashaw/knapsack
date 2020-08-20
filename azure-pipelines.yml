@@ -17,6 +17,9 @@ jobs:
         APT_INSTALL: 'gfortran'
 
   steps:
+  - checkout: self
+    submodules: true
+    displayName: "Checkout repos"
   - bash: |
       [[ "${APT_REPOSITORY}" ]] && echo "Add Repo ${APT_REPOSITORY}" && sudo add-apt-repository "${APT_REPOSITORY}"
       sudo apt-get update
