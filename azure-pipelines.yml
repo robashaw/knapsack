@@ -1,3 +1,6 @@
+trigger:
+- master
+
 jobs:
 # Configure, build, install, and test job
 - job: 'linux_build'
@@ -56,4 +59,7 @@ jobs:
   - bash: |
       cd build
       make test
-    displayName: Tests'
+    displayName: 'Tests'
+  - bash:
+      bash <(curl -s https://codecov.io/bash)
+    displayName: 'Upload to codecov.io'
