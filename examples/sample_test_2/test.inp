@@ -1,5 +1,5 @@
 calculation,	nonradiative
-memory,		0.5
+memory,		1.0
 tofile,		true
 algorithm,	stochastic
 debug,		2

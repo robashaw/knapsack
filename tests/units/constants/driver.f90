@@ -7,17 +7,17 @@ module test_cases
 contains
 	
 	subroutine factorial_positive
-		call assert_equals(1d0, factorial(1))
-		call assert_equals(120d0, factorial(5))
-		call assert_equals(3.55687428096D+14, factorial(17))
+		call assert_equals(1d0, factorial(1), 'factorial(1) failed')
+		call assert_equals(120d0, factorial(5), 'factorial(5) failed')
+		call assert_equals(3.55687428096D+14, factorial(17), 'factorial(17) failed')
 	end subroutine factorial_positive
 	
 	subroutine factorial_zero
-		call assert_equals(1d0, factorial(0))
+		call assert_equals(1d0, factorial(0), 'factorial_zero failed')
 	end subroutine factorial_zero
 	
 	subroutine factorial_negative
-		call assert_equals(1d0, factorial(-5))
+		call assert_equals(1d0, factorial(-5), 'factorial_negative failed')
 	end subroutine factorial_negative
 	
 	subroutine time_check
@@ -27,7 +27,7 @@ contains
 		! should give 4h: 9m:45s 
 		check =  '4h: 9m:45s' .eq. result
 		write(*, *) result
-		call assert_true(check)
+		call assert_true(check, 'time_check failed')
 	end subroutine time_check
 
 end module test_cases
