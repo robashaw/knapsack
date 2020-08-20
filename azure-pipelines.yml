@@ -50,7 +50,8 @@ jobs:
     displayName: 'Build Environment'
   - bash: |
       cmake -Bbuild -H. \
-        -DCMAKE_INSTALL_PREFIX=$(Agent.BuildDirectory)/Install
+        -DCMAKE_INSTALL_PREFIX=$(Agent.BuildDirectory)/Install \
+        -DCMAKE_Fortran_FLAGS="-fprofile-arcs -ftest-coverage"
     displayName: 'Configure Build'
   - bash: |
       cd build
