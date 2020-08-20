@@ -26,7 +26,7 @@ blt_append_custom_compiler_flag(
 	DEFAULT  "-ffree-form -fbackslash -fimplicit-none -fdefault-integer-8 -cpp -Wno-tabs"
 	INTEL    "-free -i8 -implicitnone -fpp -O2 -assume bscc"
 	PGI      "-Mfreeform -Mdclchk -Mstandard -Mallocatable=03 -Mbackslash")
-list(APPEND CMAKE_Fortran_FLAGS ${BLT_PROD_FLAGS})
+set (CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${BLT_PROD_FLAGS}")
 
 # add subdirectories
 add_subdirectory(src)
