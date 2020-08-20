@@ -30,20 +30,26 @@ contains
 	end subroutine n_random_ints
 	
 	subroutine n_random_ints_weighted(n, nvals, plusminus, weights, res)
-		integer(bigint), intent(in)							:: n, nvals
-		integer(bigint), dimension(2), intent(in)			:: plusminus
+		integer(bigint), intent(in)					:: n, nvals
+		integer(bigint), dimension(2), intent(in)	:: plusminus
 		real(dbl), dimension(nvals), intent(inout)	:: weights
 		integer(bigint), dimension(n), intent(out) 	:: res
 		
 		integer(bigint), dimension(:), allocatable	:: expanded_ints
-		integer(bigint)						:: mults(nvals), posres(n), negres(n)
+		integer(bigint)								:: mults(nvals), posres(n), negres(n)
 		integer(bigint)								:: ix, nt, ctr, pmmin, unity
+		real(dbl)									:: mv
 		
 		pmmin = min(plusminus(1), plusminus(2))
 		unity = 1
 		
 		! Prob distribution for adding occupations
-		weights = log10(weights / minval(weights))
+		mv = minval(weights)
+		if (mv .eq. 0) mv = 0.01d0
+		weights = log10(weights / mv)
+		do ix=1,nvals
+			weights(ix) = max(weights(ix), 0d0)
+		end do
 		mults = ceiling(weights)+1
 		nt = sum(mults)
 		allocate(expanded_ints(nt))
@@ -52,7 +58,7 @@ contains
 			expanded_ints(ctr:ctr+mults(ix)-1) = ix
 			ctr = ctr + mults(ix)
 		end do 
-		call n_random_ints(plusminus(1), unity, nt, posres)
+		call n_random_ints(plusminus(1), unity, nt+1, posres)
 		do ix=1,pmmin
 			res(2*ix-1) = expanded_ints(posres(ix))
 		end do
@@ -68,7 +74,7 @@ contains
 			expanded_ints(ctr:ctr+mults(ix)-1) = ix
 			ctr = ctr + mults(ix)
 		end do 
-		call n_random_ints(plusminus(2), unity, nt, negres)
+		call n_random_ints(plusminus(2), unity, nt+1, negres)
 		do ix=1,pmmin
 			res(2*ix) = expanded_ints(negres(ix))
 		end do

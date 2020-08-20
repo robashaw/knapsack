@@ -53,8 +53,8 @@ contains
 		integer(smallint), dimension(sys%nlevels), intent(in)		:: occ
 		integer, dimension(2), intent(out)				:: plusminus
 		integer, dimension(2*maxnchange), intent(out)	:: indices
-		call n_random_ints(2, 1, maxnchange, plusminus)
-		call n_random_ints(sum(plusminus), 1, sys%nlevels, indices)
+		call n_random_ints(2, 1, maxnchange+1, plusminus)
+		call n_random_ints(sum(plusminus), 1, sys%nlevels+1, indices)
 	end subroutine uniform_indices
 	
 	subroutine weighted_indices(sys, occ, plusminus, indices)
@@ -65,7 +65,7 @@ contains
 
 		real(dbl), dimension(sys%nlevels)	:: weights
 		integer								:: ix
-		call n_random_ints(2, 1, maxnchange, plusminus)
+		call n_random_ints(2, 1, maxnchange+1, plusminus)
 		do ix=1,sys%nlevels
 			weights(ix) = sys%fcfactors(ix, occ(ix)+1)
 		end do
