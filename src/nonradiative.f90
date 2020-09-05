@@ -10,7 +10,7 @@ module nonradiative
 		integer(bigint)									:: maxnoccs
 		character(len=100)								:: bfile, gradfile, algorithm, weighting
 		character(len=100)								:: radfile, calctype, radunits, sortby, occprefix
-		real(dbl)										:: k_ic, k_r, e_target, delta_e, gamma, tdm, memory
+		real(dbl)										:: k_ic, k_r, e_target, delta_e, gamma, tdm, memory, user_gamma
 		real(dbl), dimension(:), allocatable			:: energies, hrfactors, masses, V_vq_j
 		real(dbl), dimension(:, :), allocatable			:: fcfactors
 		real(dbl), dimension(:, :, :), allocatable		:: Bvqj
@@ -60,6 +60,7 @@ contains
 		sys%maxnfix = -1
 		sys%minnfix = -1
 		sys%occprefix = 'occs'
+		sys%user_gamma=-1.0
 	    do while (ios == 0)
 	       read(main_input_unit, '(A)', iostat=ios) buffer
 	       if (ios == 0) then
@@ -130,6 +131,8 @@ contains
    			  	 read(buffer, *, iostat=ios) sys%delta_e
 			  case ('tdm')
 			  	 read(buffer, *, iostat=ios) sys%tdm
+      		  case ('gamma')
+      			 read(buffer, *, iostat=ios) sys%user_gamma
 			  case ('levels')
 			  	 read(buffer, *, iostat=ios) sys%nlevels
 				 allocate(sys%energies(sys%nlevels))

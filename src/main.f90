@@ -152,9 +152,14 @@ program main
 			end if
 			write (*, *)
 			write (*, *) 'Calculating non-radiative rate'
+			write (*, '(1x,a,1x,e14.8)') 'With calculated gamma =', sys%gamma
 			sys%k_ic = 4d0 * sys%k_ic / sys%gamma 
 			!call sys%calculate_kic(noccs, occlist, init=.true.)
 			write (*, '(1x,a,1x,e14.8,1x,a)') 'k_ic =', sys%k_ic, 's-1'
+			if (sys%user_gamma .gt. 0) then
+				write (*, '(1x,a,1x,e14.8)') 'With user-input gamma =', sys%user_gamma
+				write (*, '(1x,a,1x,e14.8,1x,a)') 'k_ic =', sys%k_ic * (sys%gamma / sys%user_gamma), 's-1'
+			end if
 			write (*, *)
 		end if
 		
