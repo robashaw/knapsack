@@ -338,12 +338,13 @@ contains
 			do qx=1,3
 				read(gradfile_unit, *, iostat=g_ios) sys%masses(vx), grads(vx, qx)
 				if (g_ios .ne. 0) then
-					print *, 'Error reading grads, ierr=', g_ios
+					write(*, '(1x,a,1x,i4,1x,a,1x,i4)') 'Error reading grads, ierr=', g_ios, 'line=', vx
 					exit readgrads
 				end if
 			end do
 		end do readgrads
 		close(gradfile_unit)
+		write(*, '(1x,a,1x,a,1x,a,1x,i4,1x,a)') 'Read grads from', sys%gradfile, 'with', vx, 'atoms'
 		
 		open(bfile_unit, file=sys%bfile)
 		read(bfile_unit, *, iostat=b_ios)
@@ -353,7 +354,7 @@ contains
 				read(bfile_unit, *, iostat=b_ios) dummy_char1, dummy_char2, dummy1, dummy2, tmp(:)
 				sys%Bvqj(vx, qx, :) = tmp(:)
 				if (b_ios .ne. 0) then
-					print *, 'Error reading B-values, ierr=', b_ios
+					write(*, '(1x,a,1x,i4,1x,a,1x,i4)') 'Error reading B-vectors, ierr=', g_ios, 'line=', vx
 					exit readbfile
 				else
 					sys%V_vq_j(:) = sys%V_vq_j(:) + grads(vx, qx) * tmp(:) / sys%masses(vx)
@@ -361,6 +362,7 @@ contains
 			end do
 		end do readbfile
 		close(bfile_unit)
+		write(*, '(1x,a,1x,a,1x,a,1x,i4,1x,a)') 'Read B-vectors from', sys%bfile, 'with', vx, 'atoms'
 		
 		sys%V_vq_j = sys%V_vq_j * V_CONVERT / TO_S
 		! reorder V according to the energy order used
