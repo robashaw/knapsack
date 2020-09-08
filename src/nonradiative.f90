@@ -344,7 +344,7 @@ contains
 			end do
 		end do readgrads
 		close(gradfile_unit)
-		write(*, '(1x,a,1x,a,1x,a,1x,i4,1x,a)') 'Read grads from', sys%gradfile, 'with', vx, 'atoms'
+		write(*, '(1x,a,1x,a,1x,a,1x,i4,1x,a)') 'Read grads from', trim(adjustl(sys%gradfile)), 'with', vx-1, 'atoms'
 		
 		open(bfile_unit, file=sys%bfile)
 		read(bfile_unit, *, iostat=b_ios)
@@ -362,7 +362,7 @@ contains
 			end do
 		end do readbfile
 		close(bfile_unit)
-		write(*, '(1x,a,1x,a,1x,a,1x,i4,1x,a)') 'Read B-vectors from', sys%bfile, 'with', vx, 'atoms'
+		write(*, '(1x,a,1x,a,1x,a,1x,i4,1x,a)') 'Read B-vectors from', trim(adjustl(sys%bfile)), 'with', vx-1, 'atoms'
 		
 		sys%V_vq_j = sys%V_vq_j * V_CONVERT / TO_S
 		! reorder V according to the energy order used
