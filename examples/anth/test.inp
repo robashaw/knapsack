@@ -4,7 +4,9 @@ tofile,		false
 occprefix,	potato
 algorithm,	fixedn
 gamma,		1e+14
+sortby,		energy
 weighting,	fc
+debug,		2
 energy,		0.1011460
 deltae,		0.04
 natoms,		24

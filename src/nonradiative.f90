@@ -367,6 +367,13 @@ contains
 		sys%V_vq_j = sys%V_vq_j * V_CONVERT / TO_S
 		! reorder V according to the energy order used
 		call reorder_list(sys%nlevels, sys%V_vq_j, sys%energy_order)
+		if (sys%debug_level .gt. 1) then
+			write(*, *) 'Elements of V_vq_j'
+			write(*, '(1x,a4,1x,a10,1x,a20)') 'J', 'ENERGY', 'V_VQ_J'
+			do qx=1,sys%nlevels
+				write(*, '(1x,i4,1x,f10.6,1x,e20.8)') qx, sys%energies(qx), sys%V_vq_j(qx)
+			end do
+		end if
 	end subroutine sysdata_build_V
 	
 	subroutine sysdata_calc_gamma(sys)
