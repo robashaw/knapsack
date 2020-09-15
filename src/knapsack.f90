@@ -287,5 +287,119 @@ contains
 		end if
 	end subroutine screened_iterate
 	
+	subroutine lambda(sys, emax, emin, klag) 
+		type(sysdata), intent(inout)	:: sys
+		real(dbl), intent(in)			:: emax, emin
+		real(dbl), intent(out)			:: klag
+		
+		real(dbl)	:: emid, lam, deltae, en, d1, d2, step, de, predde
+		real(dbl)	:: rho, tau, trust, p, maxtrust, bestlam, beste
+		real(dbl), dimension(3) :: derivs
+		real(dbl), dimension(sys%nlevels) :: occs
+		integer		:: ix
+
+		emid = 0.5 * (emax + emin)
+		
+		bestlam = 0.0
+		lam = 16.0
+		beste = emid
+		do while (beste .gt. 0.5d0)
+			lam = lam - 0.5
+			call lagrange(sys%nlevels, sys%hrfactors, sys%energies, lam, derivs)
+			en = abs(emid - derivs(1))
+			if (en .lt. beste) then
+				beste = en
+				bestlam = lam
+			end if
+		end do
+		write(*, *)
+		write(*, *) 'LAGRANGE MULTIPLIER RESULTS'
+		write(*, '(1x,a15,1x,f10.4)') 'Starting lambda:', bestlam
+		
+		deltae = 1d0
+		p = bestlam
+		ix = 0
+		maxtrust = 1.0d0
+		trust = 0.2d0
+		do while ((deltae .gt. 0.01d0) .and. (ix .lt. 50))
+			lam = p
+			call lagrange(sys%nlevels, sys%hrfactors, sys%energies, lam, derivs)
+			en = emid - derivs(1)
+			
+			! take Newton step
+			d1 = -2d0 * en * derivs(2)
+			d2 = 2d0 * derivs(3)**2 + d1 * derivs(2)
+			
+			tau = 1d0
+			if (d2 .gt. 0) then
+				tau = min(abs(d1)/ (trust * d2), 1d0)
+			end if 
+			step = -tau * trust * d1 / abs(d1)
+			
+			p = lam + step
+			call lagrange(sys%nlevels, sys%hrfactors, sys%energies, p, derivs)
+			de = (en - emid + derivs(1))
+			predde = -(step*d1 + 0.5*step*d2*step)
+			rho = abs(de/predde)
+			if (rho .lt. 0.25) then
+				trust = 0.25*trust
+			else if ((rho .gt. 0.75) .and. ((abs(step)-trust) .lt. 1E-3)) then
+				trust = min(2.0*trust, maxtrust)
+			else
+				trust = trust 
+			end if
+			
+			if (rho .lt. 0.1) p = lam
+			
+			
+			deltae = abs(en)
+			ix = ix + 1
+		end do
+		
+		d1 = d1 / abs(d1)
+		bestlam = lam
+		beste = abs(en)
+		de = beste
+		deltae = -1d0
+		do while (deltae .lt. 0)
+			lam = lam - d1*0.005
+			call lagrange(sys%nlevels, sys%hrfactors, sys%energies, lam, derivs)
+			en = abs(emid - derivs(1))
+			if (en .lt. beste) then
+				beste = en
+				bestlam = lam
+			end if
+			deltae = en - de
+			de = en
+		end do
+		write(*, '(1x,a15,1x,e12.4,1x,a)') 'Best DE:', beste, 'eV'
+		write(*, '(1x,a15,1x,f10.4)') 'Best Lambda:', bestlam
+		
+		do ix=1,sys%nlevels
+			occs(ix) = sys%hrfactors(ix) * exp(-sys%energies(ix) * bestlam)
+		end do
+		write(*, '(1x,a15,1x,f8.2)') 'Total occ:', sum(occs)
+		write(*, '(1x,a15,1x,f10.6,1x,a)') 'Total en:', dot_product(occs, sys%energies), 'eV'
+		call sys%calculate_from_lagrange(occs, klag)
+		
+	end subroutine lambda
+	
+	subroutine lagrange(n, hrfactors, levels, lam, results)
+		integer, intent(in)						:: n
+		real(dbl), dimension(n), intent(in) 	:: levels, hrfactors
+		real(dbl), intent(in)					:: lam
+		real(dbl), dimension(3), intent(out)	:: results
+	
+		integer		:: ix
+		real(dbl) 	:: tmp
+		results = 0d0
+		do ix=1,n
+			tmp = hrfactors(ix) * exp(-levels(ix) * lam) * levels(ix)
+			results(1) = results(1) + tmp
+			results(2) = results(2) - tmp*levels(ix)
+			results(3) = results(3) + tmp*(levels(ix)**2)
+		end do
+	end subroutine lagrange
+	
 end module knapsack		
 		

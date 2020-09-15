@@ -33,6 +33,8 @@ module constants
 	real(dbl), parameter	:: HA_TO_EV = 27.2107 ! Hartree to eV
 	real(dbl), parameter	:: V_CONVERT = 1.49198625108D+5 ! TO_ME * sqrt(TO_ME/TO_EV)
 	real(dbl), parameter	:: RAD_CONVERT = 1.0781987879D+6
+	real(dbl), parameter	:: EULER = 2.718281828459045
+	real(dbl), parameter	:: M_PI  = 3.141592653589793
 	
 contains
 	real(dbl) function factorial(n) result(fac)

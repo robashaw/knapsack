@@ -1,6 +1,6 @@
 calculation,	nonradiative
 debug,		2
-algorithm,	hybrid
+algorithm,	lagrange
 tofile,		true
 energy,		0.1368950
 deltae,		0.04

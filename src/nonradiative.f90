@@ -26,6 +26,7 @@ module nonradiative
 		procedure	:: compute_zn => sysdata_compute_zn
 		procedure	:: build_V => sysdata_build_V
 		procedure	:: calculate_kic => sysdata_calc_kic
+		procedure	:: calculate_from_lagrange => sysdata_calc_lagrange
 		procedure	:: calculate_from_file => sysdata_calc_from_file
 		procedure	:: calculate_gamma => sysdata_calc_gamma
 		procedure	:: get_next_bound => sysdata_get_next_bound
@@ -474,6 +475,42 @@ contains
 		end if
 		
 	end subroutine sysdata_calc_kic
+	
+	subroutine sysdata_calc_lagrange(sys, occs, klag)
+		class(sysdata), intent(inout)					:: sys
+		real(dbl), dimension(sys%nlevels), intent(in)	:: occs
+		real(dbl), intent(out)							:: klag
+		
+		
+		real(dbl) 	:: tmp, kfcn, res(sys%nlevels), yk, nfac
+		integer		:: jx
+		
+		kfcn = 1d0
+		do jx=1, sys%nlevels
+			yk = sys%hrfactors(jx)
+			nfac = factorial(nint(occs(jx)))
+			tmp = (yk**occs(jx)) * exp(-yk) / nfac
+			kfcn = kfcn * sqrt(tmp)
+		end do
+
+		
+		do jx=1, sys%nlevels
+			res(jx) = 0.5d0 * sys%energies(jx) / sys%hrfactors(jx)
+			tmp = occs(jx) - sys%hrfactors(jx)
+			res(jx) = sqrt(res(jx) * tmp * tmp)
+			res(jx) = res(jx) * kfcn
+		end do
+		
+		tmp = dot_product(res, sys%V_vq_j)
+		tmp = tmp**2
+		tmp = 4d0 * tmp / sys%gamma
+		
+		klag = tmp * 1.9652703588D+3
+		
+		write(*, '(1x,a,1x,e14.8,1x,a)') 'Lagrange k_ic=', klag, 's-1'
+		write(*, *)
+					
+	end subroutine sysdata_calc_lagrange
 	
 	subroutine sysdata_get_next_bound(sys, occ, ix, bnd)
 		class(sysdata), intent(in)					:: sys

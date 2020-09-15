@@ -17,7 +17,7 @@ program main
 	integer(smallint), dimension(:, :), allocatable	:: guesses
 	integer									:: ix, noccs, ntot, tmp, mergerecord
 	integer(bigint)							:: worst_case, bignoccs
-	real(dbl)								:: emin, emax, start, finish, target_en
+	real(dbl)								:: emin, emax, start, finish, target_en, klag
 	real(dbl), dimension(n_guesses)			:: guess_ens
 	type(hash_tbl_sll) 						:: tbl
 	
@@ -84,6 +84,8 @@ program main
 			allocate(occlist(sys%nlevels, 1))
 			occlist = 0
 			call sys%calculate_kic(1, occlist, init=.true., stopix=0)
+			
+			call lambda(sys, emax, emin, klag)
 			select case (sys%algorithm)
 			case ('brute')
 				call brute_force(sys, emax, emin, enlist, noccs)
@@ -128,11 +130,13 @@ program main
 				write(*, '(1x,a,1x,a)') 'Saving final, unique occs to file as', tmpfile
 				call sys%mm%move_file(mergefile, mergerecord, tmpfile)
 				if (mergefile .eq. 'merged') call sys%mm%clean_up('merged', minix=1, maxix=mergerecord)
+			case ('lagrange')
+				sys%k_ic = 0.25 * klag * sys%gamma
 			case default
 				worst_case = sys%maxnoccs 
 				call screened_brute_force(sys, emax, emin, enlist, noccs, worst_case)
 			end select
-			if ((sys%algorithm .ne. 'fromfile') .and. (sys%algorithm .ne. 'stochastic') .and. (sys%algorithm .ne. 'mergefiles')) then
+			if ((sys%algorithm .eq. 'fixedn') .and. (sys%algorithm .eq. 'brute') .and. (sys%algorithm .eq. 'hybrid')) then
 				write(*, '(1x,a,1x,i10)') 'Finished block', sys%mm%current_record
 				call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=noccs-1)
 				if (sys%do_write) then
@@ -150,6 +154,7 @@ program main
 			else
 				write (*, '(1x,a,1x,i10,1x,a)') 'Found approximately', noccs, 'occs'
 			end if
+
 			write (*, *)
 			write (*, *) 'Calculating non-radiative rate'
 			write (*, '(1x,a,1x,e14.8)') 'With calculated gamma =', sys%gamma

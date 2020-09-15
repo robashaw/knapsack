@@ -1,6 +1,6 @@
 calculation,	nonradiative
 memory,		2
-algorithm,	fixedn
+algorithm,	lagrange
 nmax,		9
 nmin,		9
 tofile,		true

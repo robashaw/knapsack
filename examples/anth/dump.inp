@@ -1,9 +1,11 @@
 calculation,	nonradiative
 memory,		0.5
+sortby,		energy
 algorithm,	fromfile
+occprefix,	potato
 nrecords,	1
 debug,		1
-dump,		1
+dump,		2
 weighting,	fc
 energy,		0.1011460
 deltae,		0.04

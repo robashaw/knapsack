@@ -1,6 +1,6 @@
 calculation,	nonradiative
 memory,		2
-algorithm,	fixedn
+algorithm,	lagrange
 weighting,	fc
 energy,		0.107768
 debug,		0
