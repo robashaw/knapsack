@@ -136,7 +136,7 @@ program main
 				worst_case = sys%maxnoccs 
 				call screened_brute_force(sys, emax, emin, enlist, noccs, worst_case)
 			end select
-			if ((sys%algorithm .eq. 'fixedn') .and. (sys%algorithm .eq. 'brute') .and. (sys%algorithm .eq. 'hybrid')) then
+			if ((sys%algorithm .eq. 'fixedn') .or. (sys%algorithm .eq. 'brute') .or. (sys%algorithm .eq. 'hybrid')) then
 				write(*, '(1x,a,1x,i10)') 'Finished block', sys%mm%current_record
 				call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=noccs-1)
 				if (sys%do_write) then

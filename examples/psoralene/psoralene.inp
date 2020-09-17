@@ -2,8 +2,8 @@ calculation,	nonradiative
 memory,		2
 algorithm,	lagrange
 weighting,	fc
-energy,		0.107768
-debug,		0
+energy,		0.120768
+debug,		2
 deltae,		0.04
 natoms,		20
 bfile,		Bvectors.dat

@@ -4,11 +4,10 @@ tofile,		true
 occprefix,	potato
 algorithm,	lagrange
 gamma,		1e+14
-sortby,		energy
 weighting,	fc
 debug,		2
 energy,		0.1011460
-deltae,		0.04
+deltae,		0.005
 natoms,		24
 bfile,		Bvectors.dat
 gradfile,	NAME.dat
