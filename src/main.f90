@@ -15,10 +15,10 @@ program main
 	integer(smallint), dimension(:, :), allocatable 	:: occlist
 	real(dbl), dimension(:), allocatable	:: enlist
 	integer(smallint), dimension(:, :), allocatable	:: guesses
-	integer									:: ix, noccs, ntot, tmp, mergerecord
+	integer									:: ix, noccs, ntot, tmp, mergerecord, ncutm
 	integer(bigint)							:: worst_case, bignoccs
 	real(dbl)								:: emin, emax, start, finish, target_en, klag
-	real(dbl), dimension(n_guesses)			:: guess_ens
+	real(dbl), dimension(2*n_guesses)		:: guess_ens
 	type(hash_tbl_sll) 						:: tbl
 	
 	character(8)  :: datechar
@@ -91,13 +91,21 @@ program main
 				call brute_force(sys, emax, emin, enlist, noccs)
 			case ('stochastic')
 				sys%mm%keep_top = .true.
-				sys%maxoccs = [(min(n_cut_guess, sys%cutoffs(ix, sys%nthresh+1)), ix=1,sys%nlevels)]
-				allocate(guesses(n_guesses, sys%nlevels))
+				ncutm = n_cut_guess
+				do while (ncutm * sys%nlevels < sys%maxnfix)
+					ncutm = ncutm + 1
+				end do
+				sys%maxoccs = [(min(ncutm, sys%cutoffs(ix, sys%nthresh+1)), ix=1,sys%nlevels)]
+				allocate(guesses(2*n_guesses, sys%nlevels))
 				write(*, '(1x,a,i2)') "Generating guesses with ncut = ", n_cut_guess
 				do ix=1,n_guesses
 					target_en = emin + ((real(ix)-0.5d0)/real(n_guesses)) * (emax - emin)
-					call knap_n(target_en, sys%nlevels, sys%energies, sys%maxoccs, 0.05d0, guesses(ix, :), guess_ens(ix))
-					write (*, *) guesses(ix, :), guess_ens(ix)
+					call knap_n(target_en, sys%nlevels, sys%energies, sys%maxoccs, 0.05d0, sys%lambda_n,&
+					 			guesses(2*ix-1, :), guess_ens(2*ix-1), .true.)
+					write (*, *) guesses(2*ix-1, :), guess_ens(2*ix-1)
+					call knap_n(target_en, sys%nlevels, sys%energies, sys%maxoccs, 0.05d0, sys%lambda_n,& 
+								guesses(2*ix, :), guess_ens(2*ix), .false.)
+					write (*, *) guesses(2*ix, :), guess_ens(2*ix)
 				end do
 				sys%maxoccs = [(sys%cutoffs(ix, sys%nthresh+1), ix=1,sys%nlevels)]
 				write(*, '(1x,a,1x,i20,1x,a)') "\nSampling with", sys%nsamples, "samples\n"
@@ -154,7 +162,7 @@ program main
 			else
 				write (*, '(1x,a,1x,i10,1x,a)') 'Found approximately', noccs, 'occs'
 			end if
-
+			
 			write (*, *)
 			write (*, *) 'Calculating non-radiative rate'
 			write (*, '(1x,a,1x,e14.8)') 'With calculated gamma =', sys%gamma

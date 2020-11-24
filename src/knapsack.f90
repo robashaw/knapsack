@@ -1,6 +1,7 @@
 module knapsack
 	use constants, only : dbl, bigint, print_frequency
-	use ioutil, only : ncombinations
+	use ioutil, only : ncombinations, sort_list
+	use sample, only : differences
 	use nonradiative
 	implicit none
 contains
@@ -98,23 +99,100 @@ contains
 		end do
 	end subroutine contract
 	
-	subroutine knap_n(capacity, n, energies, occs, epsilon, res, sumres)
-		integer, intent(in)					:: n
-		real(dbl), intent(in) 				:: capacity, epsilon
-		real(dbl), dimension(n), intent(in)	:: energies
-		integer(smallint), dimension(n), intent(in)	:: occs
-		integer(smallint), dimension(n), intent(out)  :: res
-		real(dbl), intent(out)				:: sumres
+	subroutine adjust(capacity, n, energies, epsilon, nmax, res, sumres)
+		integer, intent(in)								:: n, nmax
+		real(dbl), intent(in) 							:: capacity, epsilon
+		real(dbl), dimension(n), intent(in)				:: energies
+		integer(smallint), dimension(n), intent(inout)  :: res
+		real(dbl), intent(out)							:: sumres
 		
-		integer								 :: ntot
-		integer(smallint), allocatable, dimension(:) 	 :: tempres
-		real(dbl), allocatable, dimension(:) :: totvalues
+		integer	:: ntot, ndelta, ix, jx, best_ix, best_jx, iter
+		integer(sint) 	  :: indices(n)
+		integer(smallint) :: res_sorted(n)
+		logical :: empty
+		real(dbl) :: ens_sorted(n), edelta, en_diffs(n, n), best_edelta, de
+		ntot = sum(res)
+		ndelta = nmax - ntot
+		
+		if (ndelta .ne. 0) then
+			call sort_list(n, energies, ens_sorted, indices)
+			call differences(n, ens_sorted, en_diffs)
+			do ix=1,n
+				res_sorted(ix) = res(indices(ix))
+			end do
+			
+			res_sorted(1) = res_sorted(1) + ndelta
+			neg: do ix=1,n-1
+				if (res_sorted(ix) .lt. 0) then
+					res_sorted(ix+1) = res_sorted(ix+1) + res_sorted(ix)
+					res_sorted(ix) = 0
+				else 
+					exit neg
+				end if
+			end do neg
+			res_sorted(n) = max(0, res_sorted(n))
+			
+			edelta = dot_product(ens_sorted, res_sorted)
+			edelta = capacity - edelta
+			iter = 0
+			do while ((abs(edelta) .gt. epsilon) .and. (iter < 100))
+				best_edelta = 1d0
+				do ix=1,n-1
+					do jx=ix+1,n
+						if (de*edelta .gt. 0) then 
+							empty = res_sorted(ix) < 1
+						else
+							empty = res_sorted(jx) < 1
+						end if 
+						if (.not. empty) then
+							de = abs(en_diffs(ix, jx) - edelta)
+							if (de < best_edelta) then
+								best_edelta = de
+								best_ix = ix
+								best_jx = jx
+							end if
+						end if
+					end do
+				end do
+				if (de * edelta .gt. 0) then
+					res_sorted(best_ix) = res_sorted(best_ix) - 1
+					res_sorted(best_jx) = res_sorted(best_jx) + 1
+				else 
+					res_sorted(best_ix) = res_sorted(best_ix) + 1
+					res_sorted(best_jx) = res_sorted(best_jx) - 1
+				end if
+				edelta = capacity - dot_product(ens_sorted, res_sorted)
+				iter = iter + 1
+			end do
+			
+			do ix=1,n
+				res(indices(ix)) = res_sorted(ix)
+			end do
+			sumres = dot_product(res, energies)
+		end if
+	end subroutine adjust
+	
+	subroutine knap_n(capacity, n, energies, occs, epsilon, nmax, res, sumres, with_adjust)
+		integer, intent(in)								:: n, nmax
+		real(dbl), intent(in) 							:: capacity, epsilon
+		real(dbl), dimension(n), intent(in)				:: energies
+		integer(smallint), dimension(n), intent(in)		:: occs
+		integer(smallint), dimension(n), intent(out)  	:: res
+		real(dbl), intent(out)							:: sumres
+		logical, intent(in)								:: with_adjust
+		
+		integer								 			:: ntot
+		integer(smallint), allocatable, dimension(:) 	:: tempres
+		real(dbl), allocatable, dimension(:) 			:: totvalues
 		
 		call expand(n, energies, occs, totvalues)
 		ntot = size(totvalues)
 		allocate(tempres(ntot))
 		call fptas(capacity, ntot, totvalues, epsilon, tempres, sumres)
 		call contract(n, ntot, occs, tempres, res)
+		
+		if (with_adjust) call adjust(capacity, n, energies, epsilon, nmax, res, sumres)
+		
 		deallocate(tempres)
 		deallocate(totvalues)
 	end subroutine knap_n
@@ -147,6 +225,7 @@ contains
 					if (occix .gt. sys%mm%chunk_size) then
 						write(*, '(1x,a,1x,i10)') 'Finished block', sys%mm%current_record
 						call sys%calculate_kic(sys%mm%chunk_size, sys%mm%current_block, init=.false., stopix=sys%mm%chunk_size)
+						
 						if (sys%do_write) then
 							call sys%mm%block_swap(sys%energies, sys%hrfactors, sys%mm%chunk_size, tmp)
 						else
@@ -379,9 +458,9 @@ contains
 			occs(ix) = sys%hrfactors(ix) * exp(-sys%energies(ix) * bestlam)
 		end do
 		write(*, '(1x,a15,1x,f8.2)') 'Total occ:', sum(occs)
+		sys%lambda_n = nint(sum(occs))
 		write(*, '(1x,a15,1x,f10.6,1x,a)') 'Total en:', dot_product(occs, sys%energies), 'eV'
 		call sys%calculate_from_lagrange(occs, klag)
-		
 	end subroutine lambda
 	
 	subroutine lagrange(n, hrfactors, levels, lam, results)

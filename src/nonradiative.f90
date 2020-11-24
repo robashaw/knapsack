@@ -4,9 +4,9 @@ module nonradiative
 	implicit none
 	
 	type sysdata
-		logical											:: do_rad, do_nonrad, do_write
+		logical											:: do_rad, do_nonrad, do_write, skip_rate
 		integer											:: ncut, nthresh, nlevels, nsamples, natoms, debug_level
-		integer											:: maxnfix, minnfix, nrecords
+		integer											:: maxnfix, minnfix, nrecords, lambda_n
 		integer(bigint)									:: maxnoccs
 		character(len=100)								:: bfile, gradfile, algorithm, weighting
 		character(len=100)								:: radfile, calctype, radunits, sortby, occprefix
@@ -56,6 +56,7 @@ contains
 
 		sys%debug_level = 0
 		sys%do_write = .false.
+		sys%skip_rate = .false.
 		sys%memory = 0.5d0
 		sys%nrecords = 0
 		sys%maxnfix = -1
@@ -113,6 +114,11 @@ contains
 				 if (trim(adjustl(randostring)) .eq. 'true') then
 					 sys%do_write = .true.
 				 end if
+   			  case ('norate')
+   			  	 read(buffer, *, iostat=ios) randostring
+   				 if (trim(adjustl(randostring)) .eq. 'true') then
+   					 sys%skip_rate = .true.
+   				 end if
    	          case ('natoms')
    	             read(buffer, *, iostat=ios) sys%natoms
 	          case ('nthresh')
@@ -334,36 +340,40 @@ contains
 		if (allocated(sys%Bvqj)) deallocate(sys%Bvqj)
 		allocate(sys%Bvqj(sys%natoms, 3, sys%nlevels))
 		
-		open(gradfile_unit, file=sys%gradfile)
-		readgrads: do vx=1,sys%natoms
-			do qx=1,3
-				read(gradfile_unit, *, iostat=g_ios) sys%masses(vx), grads(vx, qx)
-				if (g_ios .ne. 0) then
-					write(*, '(1x,a,1x,i4,1x,a,1x,i4)') 'Error reading grads, ierr=', g_ios, 'line=', vx
-					exit readgrads
-				end if
-			end do
-		end do readgrads
-		close(gradfile_unit)
-		write(*, '(1x,a,1x,a,1x,a,1x,i4,1x,a)') 'Read grads from', trim(adjustl(sys%gradfile)), 'with', vx-1, 'atoms'
-		
-		open(bfile_unit, file=sys%bfile)
-		read(bfile_unit, *, iostat=b_ios)
-		sys%V_vq_j = 0d0
-		readbfile: do vx=1,sys%natoms
-			do qx=1,3
-				read(bfile_unit, *, iostat=b_ios) dummy_char1, dummy_char2, dummy1, dummy2, tmp(:)
-				sys%Bvqj(vx, qx, :) = tmp(:)
-				if (b_ios .ne. 0) then
-					write(*, '(1x,a,1x,i4,1x,a,1x,i4)') 'Error reading B-vectors, ierr=', g_ios, 'line=', vx
-					exit readbfile
-				else
-					sys%V_vq_j(:) = sys%V_vq_j(:) + grads(vx, qx) * tmp(:) / sys%masses(vx)
-				end if
-			end do
-		end do readbfile
-		close(bfile_unit)
-		write(*, '(1x,a,1x,a,1x,a,1x,i4,1x,a)') 'Read B-vectors from', trim(adjustl(sys%bfile)), 'with', vx-1, 'atoms'
+		if (sys%skip_rate) then
+			sys%V_vq_j = 1.0/sqrt(sys%gamma)
+		else	
+			open(gradfile_unit, file=sys%gradfile)
+			readgrads: do vx=1,sys%natoms
+				do qx=1,3
+					read(gradfile_unit, *, iostat=g_ios) sys%masses(vx), grads(vx, qx)
+					if (g_ios .ne. 0) then
+						write(*, '(1x,a,1x,i4,1x,a,1x,i4)') 'Error reading grads, ierr=', g_ios, 'line=', vx
+						exit readgrads
+					end if
+				end do
+			end do readgrads
+			close(gradfile_unit)
+			write(*, '(1x,a,1x,a,1x,a,1x,i4,1x,a)') 'Read grads from', trim(adjustl(sys%gradfile)), 'with', vx-1, 'atoms'
+			
+			open(bfile_unit, file=sys%bfile)
+			read(bfile_unit, *, iostat=b_ios)
+			sys%V_vq_j = 0d0
+			readbfile: do vx=1,sys%natoms
+				do qx=1,3
+					read(bfile_unit, *, iostat=b_ios) dummy_char1, dummy_char2, dummy1, dummy2, tmp(:)
+					sys%Bvqj(vx, qx, :) = tmp(:)
+					if (b_ios .ne. 0) then
+						write(*, '(1x,a,1x,i4,1x,a,1x,i4)') 'Error reading B-vectors, ierr=', g_ios, 'line=', vx
+						exit readbfile
+					else
+						sys%V_vq_j(:) = sys%V_vq_j(:) + grads(vx, qx) * tmp(:) / sys%masses(vx)
+					end if
+				end do
+			end do readbfile
+			close(bfile_unit)
+			write(*, '(1x,a,1x,a,1x,a,1x,i4,1x,a)') 'Read B-vectors from', trim(adjustl(sys%bfile)), 'with', vx-1, 'atoms'
+		end if
 		
 		sys%V_vq_j = sys%V_vq_j * V_CONVERT / TO_S
 		! reorder V according to the energy order used
@@ -435,8 +445,8 @@ contains
 			sums = 0d0
 			nsums = 0d0
 			sys%k_ic = 0d0
-			if (.not. allocated(sys%V_vq_j)) call sys%build_V(grads)
 			call sys%calculate_gamma
+			if (.not. allocated(sys%V_vq_j)) call sys%build_V(grads)
 		end if
 		
 		do nx=1,stopix

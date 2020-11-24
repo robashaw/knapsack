@@ -6,7 +6,7 @@ module constants
 	integer, parameter		:: bigint = int64
 	integer, parameter		:: sint = int32
 	integer, parameter		:: smallint = int16
-	integer, parameter		:: maxnchange = 10
+	integer, parameter		:: maxnchange = 15
 	integer, parameter		:: main_input_unit = 15
 	integer, parameter		:: bfile_unit = 16
 	integer, parameter		:: gradfile_unit = 17
@@ -14,8 +14,8 @@ module constants
 	integer, parameter		:: occs_unit = 19
 	integer, parameter		:: occs_unit_2 = 20
 	integer, parameter		:: output_unit = 21
-	integer, parameter		:: n_guesses = 10
-	integer, parameter		:: n_cut_guess = 4	
+	integer, parameter		:: n_guesses = 15
+	integer, parameter		:: n_cut_guess = 2	
 	integer, parameter		:: topkeep = 100000
 	integer, parameter		:: print_frequency = 100000000
 	real(dbl), parameter	:: tolint = 1D-12

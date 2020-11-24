@@ -75,9 +75,9 @@ contains
 	subroutine do_sample(sys, guesses, occs, guess_ens, emin, emax, ixfunc, enlist, noccs)
 		type(sysdata), intent(inout)										:: sys
 		integer(smallint), dimension(sys%nlevels), intent(in)				:: occs
-		integer(smallint), dimension(n_guesses, sys%nlevels), intent(in)	:: guesses
+		integer(smallint), dimension(2*n_guesses, sys%nlevels), intent(in)	:: guesses
 		real(dbl), intent(in)												:: emin, emax
-		real(dbl), dimension(n_guesses), intent(in)							:: guess_ens
+		real(dbl), dimension(2*n_guesses), intent(in)						:: guess_ens
 		real(dbl), dimension(sys%mm%chunk_size), intent(out)				:: enlist
 		integer(bigint), intent(out)										:: noccs
 			
@@ -99,7 +99,7 @@ contains
 		character(len=100)							:: mergefile, tmpfile
 		
 		noccs = 0
-		do jx=1,n_guesses
+		do jx=1,2*n_guesses
 			call add_occ(sys, emin, emax, noccs, guesses(jx, :), enlist)
 		end do
 		
