@@ -167,17 +167,20 @@ program main
 			write (*, *) 'Calculating non-radiative rate'
 			write (*, '(1x,a,1x,e14.8)') 'With calculated gamma =', sys%gamma
 			sys%k_ic = 4d0 * sys%k_ic / sys%gamma 
+			sys%k_ic_ht = 4d0 * sys%k_ic_ht / sys%gamma
 			!call sys%calculate_kic(noccs, occlist, init=.true.)
-			write (*, '(1x,a,1x,e14.8,1x,a)') 'k_ic =', sys%k_ic, 's-1'
+			write (*, '(1x,a,1x,e14.8,1x,a)') 'k_ic_fc =', sys%k_ic, 's-1'
+			if (sys%hessfile .ne. 'none') write (*, '(1x,a,1x,e14.8,1x,a)') 'k_ic_ht =', sys%k_ic_ht, 's-1'
 			if (sys%user_gamma .gt. 0) then
 				write (*, '(1x,a,1x,e14.8)') 'With user-input gamma =', sys%user_gamma
-				write (*, '(1x,a,1x,e14.8,1x,a)') 'k_ic =', sys%k_ic * (sys%gamma / sys%user_gamma), 's-1'
+				write (*, '(1x,a,1x,e14.8,1x,a)') 'k_ic_fc =', sys%k_ic * (sys%gamma / sys%user_gamma), 's-1'
+				if (sys%hessfile .ne. 'none') write (*, '(1x,a,1x,e14.8,1x,a)') 'k_ic_ht =', sys%k_ic_ht * (sys%gamma / sys%user_gamma), 's-1'
 			end if
 			write (*, *)
 		end if
 		
 		if (sys%do_rad .and. sys%do_nonrad) then
-			write (*, '(1x,a,1x,f12.8,1x,a)') 'PLQY =', 100d0 * sys%k_r/(sys%k_r + sys%k_ic), '%'
+			write (*, '(1x,a,1x,f12.8,1x,a)') 'PLQY =', 100d0 * sys%k_r/(sys%k_r + sys%k_ic + sys%k_ic_ht), '%'
 		end if
 		
 		call cpu_time(finish)

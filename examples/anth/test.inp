@@ -2,7 +2,7 @@ calculation,	nonradiative
 memory,		2.0
 tofile,		false
 occprefix,	potato
-algorithm,	stochastic
+algorithm,	hybrid
 gamma,		1e+14
 weighting,	fc
 debug,		2

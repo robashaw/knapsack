@@ -8,12 +8,11 @@ module nonradiative
 		integer											:: ncut, nthresh, nlevels, nsamples, natoms, debug_level
 		integer											:: maxnfix, minnfix, nrecords, lambda_n
 		integer(bigint)									:: maxnoccs
-		character(len=100)								:: bfile, gradfile, algorithm, weighting
+		character(len=100)								:: bfile, gradfile, hessfile, algorithm, weighting
 		character(len=100)								:: radfile, calctype, radunits, sortby, occprefix
-		real(dbl)										:: k_ic, k_r, e_target, delta_e, gamma, tdm, memory, user_gamma
+		real(dbl)										:: k_ic, k_ic_ht, k_r, e_target, delta_e, gamma, tdm, memory, user_gamma
 		real(dbl), dimension(:), allocatable			:: energies, hrfactors, masses, V_vq_j
-		real(dbl), dimension(:, :), allocatable			:: fcfactors
-		real(dbl), dimension(:, :, :), allocatable		:: Bvqj
+		real(dbl), dimension(:, :), allocatable			:: fcfactors, V_jj, Bvqj
 		integer, dimension(:, :), allocatable			:: cutoffs, bounds
 		integer(sint), dimension(:), allocatable		:: energy_order
 		integer(smallint), dimension(:), allocatable	:: minoccs, maxoccs
@@ -62,6 +61,7 @@ contains
 		sys%maxnfix = -1
 		sys%minnfix = -1
 		sys%occprefix = 'occs'
+		sys%hessfile  = 'none'
 		sys%user_gamma=-1.0
 	    do while (ios == 0)
 	       read(main_input_unit, '(A)', iostat=ios) buffer
@@ -83,6 +83,9 @@ contains
    			  case ('gradfile')
    			  	 read(buffer, *, iostat=ios) sys%gradfile
    				 sys%gradfile = trim(adjustl(sys%gradfile))
+      		  case ('hessfile')
+      		  	 read(buffer, *, iostat=ios) sys%hessfile
+      			 sys%hessfile = trim(adjustl(sys%hessfile))
       		  case ('algorithm')
       			 read(buffer, *, iostat=ios) sys%algorithm
       			 sys%algorithm = trim(adjustl(sys%algorithm))
@@ -290,6 +293,7 @@ contains
 		if (allocated(sys%fcfactors)) deallocate(sys%fcfactors)
 		if (allocated(sys%V_vq_j)) deallocate(sys%V_vq_j)
 		if (allocated(sys%Bvqj)) deallocate(sys%Bvqj)
+		if (allocated(sys%V_jj)) deallocate(sys%V_jj)
 		if (allocated(sys%cutoffs)) deallocate(sys%cutoffs)
 		if (allocated(sys%bounds)) deallocate(sys%bounds)
 		if (allocated(sys%energy_order)) deallocate(sys%energy_order)
@@ -325,20 +329,22 @@ contains
 		end do
 	end subroutine sysdata_compute_zn
 	
-	subroutine sysdata_build_V(sys, grads)
-		class(sysdata), intent(inout)	:: sys
+	subroutine sysdata_build_V(sys, grads, hessian)
+		class(sysdata), intent(inout)					 	 	:: sys
+		real(dbl), dimension(sys%natoms, 3), intent(inout)  	:: grads
+		real(dbl), dimension(:, :), allocatable, intent(inout)  :: hessian
 		
 		integer								:: b_ios, g_ios, vx, qx, dummy1, dummy2
 		character(len=1)					:: dummy_char1, dummy_char2
 		real(dbl), dimension(sys%nlevels)	:: tmp
-		real(dbl), dimension(sys%natoms, 3) :: grads
+		real(dbl), dimension(3*sys%natoms, sys%nlevels) :: tmphess
 		
 		if (allocated(sys%masses)) deallocate(sys%masses)
 		allocate(sys%masses(sys%natoms))
 		if (allocated(sys%V_vq_j)) deallocate(sys%V_vq_j)
 		allocate(sys%V_vq_j(sys%nlevels))
 		if (allocated(sys%Bvqj)) deallocate(sys%Bvqj)
-		allocate(sys%Bvqj(sys%natoms, 3, sys%nlevels))
+		allocate(sys%Bvqj(3*sys%natoms, sys%nlevels))
 		
 		if (sys%skip_rate) then
 			sys%V_vq_j = 1.0/sqrt(sys%gamma)
@@ -362,7 +368,8 @@ contains
 			readbfile: do vx=1,sys%natoms
 				do qx=1,3
 					read(bfile_unit, *, iostat=b_ios) dummy_char1, dummy_char2, dummy1, dummy2, tmp(:)
-					sys%Bvqj(vx, qx, :) = tmp(:)
+					call reorder_list(sys%nlevels, tmp, sys%energy_order)
+					sys%Bvqj(3*(vx-1)+qx, :) = tmp(:) / sqrt(sys%masses(vx))
 					if (b_ios .ne. 0) then
 						write(*, '(1x,a,1x,i4,1x,a,1x,i4)') 'Error reading B-vectors, ierr=', g_ios, 'line=', vx
 						exit readbfile
@@ -373,17 +380,52 @@ contains
 			end do readbfile
 			close(bfile_unit)
 			write(*, '(1x,a,1x,a,1x,a,1x,i4,1x,a)') 'Read B-vectors from', trim(adjustl(sys%bfile)), 'with', vx-1, 'atoms'
+			
+			if (sys%hessfile .ne. 'none') then
+				if (allocated(hessian)) deallocate(hessian)
+				allocate(hessian(3*sys%natoms, 3*sys%natoms))
+				if (allocated(sys%V_jj)) deallocate(sys%V_jj)
+				allocate(sys%V_jj(sys%nlevels, sys%nlevels))
+				
+				open(hessfile_unit, file=sys%hessfile)
+				readhess: do vx=1,3*sys%natoms
+					do qx=1,vx
+						read(hessfile_unit, *, iostat=b_ios) hessian(vx, qx)
+						if (b_ios .ne. 0) then
+							write(*, '(1x,a,1x,i4,1x,a,1x,i4)') 'Error reading hessian, ierr=', b_ios, 'line=', vx
+							exit readhess
+						end if
+						hessian(qx, vx) = hessian(vx, qx)
+					end do 
+				end do readhess
+				close(hessfile_unit)
+				write(*, '(1x,a,1x,a,1x,a,1x,i4,1x,a)') 'Read Hessian from', trim(adjustl(sys%hessfile)), 'with', (vx-1)/3, 'atoms'
+				
+				tmphess = matmul(hessian, sys%Bvqj)
+				sys%V_jj = matmul(transpose(sys%Bvqj), tmphess)		
+				
+				sys%V_jj = sys%V_jj * V_CONVERT / TO_S
+				
+			end if
 		end if
 		
 		sys%V_vq_j = sys%V_vq_j * V_CONVERT / TO_S
-		! reorder V according to the energy order used
-		call reorder_list(sys%nlevels, sys%V_vq_j, sys%energy_order)
 		if (sys%debug_level .gt. 1) then
-			write(*, *) 'Elements of V_vq_j'
+			write(*, *) 'Elements of V_vq_j (FC)'
 			write(*, '(1x,a4,1x,a10,1x,a20)') 'J', 'ENERGY', 'V_VQ_J'
 			do qx=1,sys%nlevels
 				write(*, '(1x,i4,1x,f10.6,1x,e20.8)') qx, sys%energies(qx), sys%V_vq_j(qx)
 			end do
+			
+			if ((sys%debug_level .gt. 2) .and. (sys%hessfile .ne. 'none')) then
+				write(*, *) 'Elements of V_ij (HT)'
+				write(*, '(1x,a4,1x,a4,1x,a20)') 'I', 'J', 'V_VQ_J'
+				do qx=1,sys%nlevels
+					do vx=1,qx
+						write(*, '(1x,i4,1x,i4,1x,e20.8)') qx, vx, sys%V_jj(qx, vx)
+					end do
+				end do
+			end if
 		end if
 	end subroutine sysdata_build_V
 	
@@ -437,16 +479,19 @@ contains
 		
 		integer			:: nx, ix
 		integer(bigint)	:: counter(20)
-		real(dbl)		:: res(sys%nlevels), tmp
+		real(dbl)		:: z(sys%nlevels), res(sys%nlevels), tmp
 		real(dbl)		:: grads(sys%natoms, 3), sums(20), nsums(100)
+		
+		real(dbl), dimension(:, :), allocatable  :: hessian
 		
 		if (init) then
 			counter = 0
 			sums = 0d0
 			nsums = 0d0
 			sys%k_ic = 0d0
+			sys%k_ic_ht = 0d0
 			call sys%calculate_gamma
-			if (.not. allocated(sys%V_vq_j)) call sys%build_V(grads)
+			if (.not. allocated(sys%V_vq_j)) call sys%build_V(grads, hessian)
 		end if
 		
 		do nx=1,stopix
@@ -467,7 +512,6 @@ contains
 			end if
 		end do
 		
-		
 		if (sys%debug_level .gt. 2) then
 			write(*, *) '\nLog10', 'Counter', 'Sum'
 			do nx=1,20
@@ -484,6 +528,22 @@ contains
 			end do
 		end if
 		
+		if (sys%hessfile .ne. 'none') then
+			! Do Hertzberg-Teller calculation
+			do nx=1,stopix
+				call sys%compute_zn(occs(:, nx), z)
+				res = matmul(sys%V_jj, z)
+				do ix=1,sys%nlevels
+					z(ix) = 0.5 * (occs(ix, nx) + sys%hrfactors(ix))**2
+					z(ix) = z(ix) / (sys%energies(ix)*sys%hrfactors(ix))
+					z(ix) = sqrt(z(ix))
+				end do
+				tmp = dot_product(res, z)
+				tmp = tmp**2
+				sys%k_ic_ht = sys%k_ic_ht + tmp
+			end do
+		end if
+		
 	end subroutine sysdata_calc_kic
 	
 	subroutine sysdata_calc_lagrange(sys, occs, klag)
@@ -492,7 +552,7 @@ contains
 		real(dbl), intent(out)							:: klag
 		
 		
-		real(dbl) 	:: tmp, kfcn, res(sys%nlevels), yk, nfac
+		real(dbl) 	:: tmp, kfcn, z(sys%nlevels), res(sys%nlevels), yk, nfac
 		integer		:: jx
 		
 		kfcn = 1d0
@@ -514,10 +574,24 @@ contains
 		tmp = dot_product(res, sys%V_vq_j)
 		tmp = tmp**2
 		tmp = 4d0 * tmp / sys%gamma
+		klag = tmp * 1.9652703588D+3	
 		
-		klag = tmp * 1.9652703588D+3
+		write(*, '(1x,a,1x,e14.8,1x,a)') 'Lagrange k_ic_fc=', klag, 's-1'
 		
-		write(*, '(1x,a,1x,e14.8,1x,a)') 'Lagrange k_ic=', klag, 's-1'
+		if (sys%hessfile .ne. 'none') then
+			z = matmul(sys%V_jj, res)
+			do jx=1, sys%nlevels
+				res(jx) = 0.5 * (occs(jx) + sys%hrfactors(jx))**2
+				res(jx) = res(jx) / (sys%energies(jx)*sys%hrfactors(jx))
+				res(jx) = sqrt(res(jx))
+			end do
+			tmp = dot_product(res, z)
+			tmp = tmp**2
+			tmp = 4d0 * tmp / sys%gamma
+			tmp = tmp * 1.9652703588D+3
+			
+			write(*, '(1x,a,1x,e14.8,1x,a)') 'Lagrange k_ic_ht=', tmp, 's-1'
+		end if	
 		write(*, *)
 					
 	end subroutine sysdata_calc_lagrange

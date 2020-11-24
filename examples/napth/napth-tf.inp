@@ -1,12 +1,13 @@
 calculation,	nonradiative
-debug,		2
-algorithm,	lagrange
+debug,		3
+algorithm,	hybrid
 tofile,		true
 energy,		0.1368950
 deltae,		0.04
 natoms,		18
 bfile,		'Bvectors.dat'
 gradfile,	'NAME.dat'
+hessfile,	'Naph_hessian.dat'
 ncut,		14
 nthresh,	21
 nsamples,	5000000

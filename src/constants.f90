@@ -14,6 +14,7 @@ module constants
 	integer, parameter		:: occs_unit = 19
 	integer, parameter		:: occs_unit_2 = 20
 	integer, parameter		:: output_unit = 21
+	integer, parameter		:: hessfile_unit = 22
 	integer, parameter		:: n_guesses = 15
 	integer, parameter		:: n_cut_guess = 2	
 	integer, parameter		:: topkeep = 100000
