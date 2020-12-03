@@ -404,7 +404,7 @@ contains
 				tmphess = matmul(hessian, sys%Bvqj)
 				sys%V_jj = matmul(transpose(sys%Bvqj), tmphess)		
 				
-				sys%V_jj = sys%V_jj * V_CONVERT / TO_S
+				sys%V_jj = sys%V_jj * V_CONVERT / TO_MD
 				
 			end if
 		end if

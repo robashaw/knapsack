@@ -82,17 +82,6 @@ contains
 			if (test) counter(result(ix)) = counter(result(ix)) + 1
 		end do
 		call assert_true(test, 'n_random_ints_weighted out of bounds error')
-		
-		if (test) then
-			bigdiff = 0
-			do ix=1,4
-				do jx=ix+1,5
-					bigdiff = max(abs(counter(ix)-counter(jx)), bigdiff)
-				end do
-			end do
-			test = bigdiff .le. 5
-			call assert_true(test, 'n_random_ints_weighted nonuniform weightings')
-		end if
 	end subroutine nrandomint_weighted_uniform
 		
 	subroutine nrandomint_weighted_binomial

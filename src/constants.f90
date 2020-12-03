@@ -28,6 +28,7 @@ module constants
 	real(dbl), parameter	:: TO_EV = 27.21138602 ! Ha to eV
 	real(dbl), parameter	:: TO_S  = 2.418884326509D-17 ! a.u. to s
 	real(dbl), parameter	:: TO_CM = 8065.5 ! eV to cm-1
+	real(dbl), parameter	:: TO_MD = 8.2387234983 ! au of force in mDyne
 	real(dbl), parameter	:: KJ_TO_EV = 0.0103641 ! kJ/mol to eV
 	real(dbl), parameter	:: CM_TO_EV = 1.23981D-4 ! cm-1 to eV
 	real(dbl), parameter	:: KCAL_TO_EV = 0.0433634 ! kcal/ol to eV
